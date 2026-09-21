@@ -257,7 +257,7 @@ export class ComposioConnector implements ComposioProvider {
     const canonicalByKey = new Map(
       canonicalToolkits.map((toolkit) => [composioSlugKey(toolkit), toolkit]),
     );
-    const liveAccountIds = await this.listActiveAccountIds(userId);
+    const liveAccountIds = await this.listActiveAccountIds(userId, canonicalToolkits);
     const accountIdsByToolkit = new Map<string, Set<string>>();
     for (const connection of connections) {
       const accountId = connection.providerRef?.trim();
@@ -482,16 +482,21 @@ export class ComposioConnector implements ComposioProvider {
     return ids[0];
   }
 
-  private async listActiveAccountIds(userId: string): Promise<Set<string> | null> {
+  private async listActiveAccountIds(
+    userId: string,
+    toolkits: string[],
+  ): Promise<Set<string> | null> {
     try {
       const listed = await this.sdk().connectedAccounts.list({
         userIds: [userId],
+        ...(toolkits.length > 0 ? { toolkitSlugs: toolkits } : {}),
         statuses: ["ACTIVE"],
       });
-      const ids = (listed.items ?? [])
-        .map((item) => item.id)
-        .filter((id): id is string => Boolean(id));
-      return ids.length > 0 ? new Set(ids) : null;
+      // A successful list is the allowlist, including empty. Only a thrown
+      // lookup leaves filtering skipped so an outage does not strip every pin.
+      return new Set(
+        (listed.items ?? []).map((item) => item.id).filter((id): id is string => Boolean(id)),
+      );
     } catch {
       return null;
     }
