@@ -1,6 +1,7 @@
 import { ACTIVE_RUN_STATUSES } from "@rakazo/core";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { AvatarStyleProvider } from "./avatar-style.js";
 import {
   BotAvatar,
   DEFAULT_GROK_BOT_COLOR,
@@ -121,5 +122,44 @@ describe("BotAvatar", () => {
     expect(html).toContain('aria-label="hex"');
     expect(html).toContain('aria-pressed="true"');
     expect(html).toContain("focus-visible:ring-2");
+  });
+
+  it("renders distinct robot and organic previews for the same identity", () => {
+    const robot = renderToString(
+      <BotAvatar color="#D9508A" identity="avatar-style-preview" variant="robot" />,
+    );
+    const organic = renderToString(
+      <BotAvatar color="#D9508A" identity="avatar-style-preview" variant="organic" />,
+    );
+    expect(robot).not.toEqual(organic);
+    expect(robot).toContain("grok-character-eyes");
+    expect(organic).toContain("rakazo-organic-avatar");
+    expect(organic).not.toContain("grok-character-eyes");
+  });
+
+  it("uses the preferred avatar style when variant is omitted", () => {
+    const html = renderToString(
+      <AvatarStyleProvider value="organic">
+        <BotAvatar color="#D9508A" identity="maya" />
+      </AvatarStyleProvider>,
+    );
+    expect(html).toContain("rakazo-organic-avatar");
+    expect(html).not.toContain("grok-character-eyes");
+  });
+
+  it("keeps uploaded images when the organic style is preferred", () => {
+    const html = renderToString(
+      <BotAvatar color="data:image/png;base64,abc" identity="maya" variant="organic" />,
+    );
+    expect(html).toContain("<img");
+    expect(html).not.toContain("rakazo-organic-avatar");
+  });
+
+  it("keeps an encoded studio shape when the organic style is preferred", () => {
+    const html = renderToString(
+      <BotAvatar color={`${DEFAULT_GROK_BOT_COLOR}::shape_3`} identity="maya" variant="organic" />,
+    );
+    expect(html).toContain("grok-character-eyes");
+    expect(html).not.toContain("rakazo-organic-avatar");
   });
 });
