@@ -14,6 +14,7 @@ import {
   isNoAuthToolkitError,
   mergeConnectedPlugins,
   needsLivePluginSync,
+  pickReusableConnection,
   planLiveConnectionSync,
   sanitizeComposioError,
 } from "./composio-connector.js";
@@ -318,6 +319,57 @@ describe("composio tool mapping", () => {
         },
       },
     });
+  });
+
+  it("drops a dead sibling account id so it cannot poison discovery", async () => {
+    composioSdkState.created.length = 0;
+    composioSdkState.sessions.clear();
+    composioToolkitDirectory.invalidate();
+    const previousList = composioSdkState.connectedAccounts.list;
+    composioSdkState.connectedAccounts.list = async () => ({
+      items: [{ id: "ca_current" }],
+    });
+
+    try {
+      const connector = new ComposioConnector();
+      await expect(
+        connector.discoverTools({
+          operationId: "composio-dead-sibling",
+          traceId: "composio-dead-sibling",
+          spaceId: "workspace",
+          userId: "user-1",
+          signal: new AbortController().signal,
+          connectedConnections: [
+            {
+              id: "connection-revoked",
+              connectorId: "composio",
+              externalId: "github",
+              displayName: "GitHub",
+              providerRef: "ca_old",
+            },
+            {
+              id: "connection-live",
+              connectorId: "composio",
+              externalId: "github",
+              displayName: "GitHub",
+              providerRef: "ca_current",
+            },
+          ],
+        }),
+      ).resolves.toContainEqual(expect.objectContaining({ name: "GITHUB_GET_REPOS" }));
+
+      expect(composioSdkState.created.at(-1)).toEqual({
+        userId: "user-1",
+        config: {
+          manageConnections: false,
+          sandbox: { enable: false },
+          toolkits: ["GITHUB"],
+          connectedAccounts: { GITHUB: ["ca_current"] },
+        },
+      });
+    } finally {
+      composioSdkState.connectedAccounts.list = previousList;
+    }
   });
 
   it("pins a single concrete account without enabling multi-account mode", async () => {
@@ -663,7 +715,7 @@ describe("composio tool mapping", () => {
     ).toEqual({ connectIds: [], revokeIds: [] });
   });
 
-  it("reconnects existing error or revoked rows instead of inserting duplicates", () => {
+  it("reconnects existing error rows instead of inserting duplicates", () => {
     expect(
       planLiveConnectionSync(
         [
@@ -674,8 +726,30 @@ describe("composio tool mapping", () => {
         ["gmail", "slack", "github", "slack"],
       ),
     ).toEqual({
-      connectIds: ["row-err", "row-old"],
+      connectIds: ["row-err"],
       revokeIds: [],
+    });
+  });
+
+  it("does not revive a revoked sibling when a live row shares the provider slug", () => {
+    expect(
+      planLiveConnectionSync(
+        [
+          { id: "row-old", provider: "gmail", status: "revoked", displayName: "Gmail" },
+          { id: "row-live", provider: "gmail", status: "connected", displayName: "Gmail" },
+        ],
+        ["gmail"],
+      ),
+    ).toEqual({ connectIds: [], revokeIds: [] });
+    expect(
+      pickReusableConnection([
+        { id: "row-old", status: "revoked" },
+        { id: "row-live", status: "connected" },
+      ]),
+    ).toBeUndefined();
+    expect(pickReusableConnection([{ id: "row-old", status: "revoked" }])).toEqual({
+      id: "row-old",
+      status: "revoked",
     });
   });
 
