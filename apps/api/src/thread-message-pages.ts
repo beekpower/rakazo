@@ -183,7 +183,22 @@ async function withUsage(prisma: MessageDb, messages: ThreadMessage[]): Promise<
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
-  return attachMessageUsageByRun(messages, aggregateUsageRecords(rows));
+  const usageByRun = aggregateUsageRecords(rows);
+  if (usageByRun.size === 0) return messages;
+
+  // Prefer the thread-wide last bot message for each run so an older page that only
+  // contains narration does not get the full run total.
+  const terminalRows = await prisma.message.findMany({
+    where: { runId: { in: [...usageByRun.keys()] }, role: "bot" },
+    select: { id: true, runId: true, seq: true },
+    orderBy: { seq: "desc" },
+  });
+  const terminalMessageIdByRun = new Map<string, string>();
+  for (const row of terminalRows) {
+    if (!row.runId || terminalMessageIdByRun.has(row.runId)) continue;
+    terminalMessageIdByRun.set(row.runId, row.id);
+  }
+  return attachMessageUsageByRun(messages, usageByRun, terminalMessageIdByRun);
 }
 
 function toThreadMessage(row: {

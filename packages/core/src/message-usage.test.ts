@@ -221,7 +221,7 @@ describe("message usage", () => {
     });
   });
 
-  it("attaches aggregated usage to one target message per run", () => {
+  it("attaches aggregated usage to the thread-wide terminal when given its id", () => {
     const usageByRun = new Map([
       [
         "run-1",
@@ -254,12 +254,23 @@ describe("message usage", () => {
       },
     ];
 
-    const next = attachMessageUsageByRun(messages, usageByRun);
-    expect(next[0]).toEqual(messages[0]);
-    expect(next[1]).toMatchObject({
+    const onPage = attachMessageUsageByRun(
+      messages,
+      usageByRun,
+      new Map([["run-1", "bot-terminal"]]),
+    );
+    expect(onPage[0]).toEqual(messages[0]);
+    expect(onPage[1]).toMatchObject({
       id: "bot-terminal",
       usage: usageByRun.get("run-1"),
     });
+
+    const olderOnly = attachMessageUsageByRun(
+      [messages[0]!],
+      usageByRun,
+      new Map([["run-1", "bot-terminal"]]),
+    );
+    expect(olderOnly[0]).toEqual(messages[0]);
   });
 
   it("moves usage onto the terminal reply when concentrating a run", () => {

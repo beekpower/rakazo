@@ -171,12 +171,17 @@ export function applyMessageUsageByRunId(
 export function attachMessageUsageByRun(
   messages: readonly ThreadMessage[],
   usageByRun: ReadonlyMap<string, MessageUsage>,
+  terminalMessageIdByRun?: ReadonlyMap<string, string>,
 ): ThreadMessage[] {
   if (usageByRun.size === 0) return messages as ThreadMessage[];
 
   const targetByRun = new Map<string, number>();
   for (const runId of usageByRun.keys()) {
-    const index = findMessageUsageTargetIndex(messages, runId);
+    const terminalId = terminalMessageIdByRun?.get(runId);
+    const index =
+      terminalId !== undefined
+        ? messages.findIndex((message) => message.id === terminalId)
+        : findMessageUsageTargetIndex(messages, runId);
     if (index >= 0) targetByRun.set(runId, index);
   }
   if (targetByRun.size === 0) return messages as ThreadMessage[];
@@ -191,4 +196,17 @@ export function attachMessageUsageByRun(
     return { ...message, usage };
   });
   return changed ? next : (messages as ThreadMessage[]);
+}
+
+/** After merging history pages, keep each run's usage on one preferred message. */
+export function concentrateAllMessageUsage(messages: readonly ThreadMessage[]): ThreadMessage[] {
+  const runIds = new Set<string>();
+  for (const message of messages) {
+    if (message.role === "bot" && message.runId && message.usage) runIds.add(message.runId);
+  }
+  let next = messages as ThreadMessage[];
+  for (const runId of runIds) {
+    next = concentrateMessageUsageByRunId(next, runId);
+  }
+  return next;
 }

@@ -626,7 +626,17 @@ describe("thread message pages", () => {
           },
         ]),
       },
-      message: { findMany },
+      message: {
+        findMany: vi.fn(async (query: { select?: unknown }) => {
+          if (query.select) {
+            return [
+              { id: "message-terminal", runId: "run-1", seq: 3 },
+              { id: "message-narration", runId: "run-1", seq: 2 },
+            ];
+          }
+          return findMany();
+        }),
+      },
       run: { findMany: vi.fn(async () => []) },
     } as unknown as PrismaClient;
 
@@ -647,5 +657,63 @@ describe("thread message pages", () => {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       }),
     );
+  });
+
+  it("does not attach run usage onto an older page that lacks the terminal reply", async () => {
+    const findMany = vi.fn(async () => [
+      {
+        id: "message-narration",
+        threadId: "thread-1",
+        seq: 2,
+        role: "bot",
+        blocks: [{ kind: "text", text: "Working." }],
+        botId: "bot-1",
+        replyToMessageId: null,
+        runId: "run-1",
+        createdAt: new Date("2026-08-16T00:00:02.000Z"),
+      },
+      {
+        id: "message-user",
+        threadId: "thread-1",
+        seq: 1,
+        role: "user",
+        blocks: [{ kind: "text", text: "Hi" }],
+        botId: null,
+        replyToMessageId: null,
+        runId: "run-1",
+        createdAt: new Date("2026-08-16T00:00:01.000Z"),
+      },
+    ]);
+    const prisma = {
+      usageRecord: {
+        findMany: vi.fn(async () => [
+          {
+            runId: "run-1",
+            provider: "scripted",
+            model: "scripted",
+            inputTokens: 12,
+            outputTokens: 40,
+          },
+        ]),
+      },
+      message: {
+        findMany: vi.fn(async (query: { select?: unknown }) => {
+          if (query.select) {
+            return [
+              { id: "message-terminal", runId: "run-1", seq: 3 },
+              { id: "message-narration", runId: "run-1", seq: 2 },
+            ];
+          }
+          return findMany();
+        }),
+      },
+      run: { findMany: vi.fn(async () => []) },
+    } as unknown as PrismaClient;
+
+    const page = await loadMessagePage(prisma, "thread-1", undefined, 2);
+
+    expect(
+      page.messages.find((message) => message.id === "message-narration")?.usage,
+    ).toBeUndefined();
   });
 });

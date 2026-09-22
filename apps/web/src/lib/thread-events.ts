@@ -11,6 +11,7 @@ import type {
 import {
   addMessageUsage,
   applyMessageUsageByRunId,
+  concentrateAllMessageUsage,
   concentrateMessageUsageByRunId,
   isActive,
   isMessageUsage,
@@ -192,7 +193,9 @@ export function mergeThreadSnapshot(
   // A threads.get started before SSE caught up must not wipe newer live state
   // (e.g. ask cards applied after send's post-refresh request was already in flight).
   if (prev && prev.threadId === next.threadId && prev.cursor > next.cursor) return prev;
-  return mergeThreadHistory(prev, next, preserveLoadedHistory);
+  const merged = mergeThreadHistory(prev, next, preserveLoadedHistory);
+  const messages = concentrateAllMessageUsage(merged.messages);
+  return messages === merged.messages ? merged : { ...merged, messages };
 }
 
 /**
@@ -278,7 +281,10 @@ export function prependThreadMessagePage(
   prev: ThreadSnapshot | null,
   page: ThreadMessagePage,
 ): ThreadSnapshot | null {
-  return prependThreadHistoryPage(prev, page);
+  const next = prependThreadHistoryPage(prev, page);
+  if (!next) return null;
+  const messages = concentrateAllMessageUsage(next.messages);
+  return messages === next.messages ? next : { ...next, messages };
 }
 
 export function isThreadSnapshotEvent(event: ProductEvent): boolean {

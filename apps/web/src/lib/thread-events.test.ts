@@ -481,9 +481,9 @@ describe("thread event reduction", () => {
     expect(
       withTerminalCreated?.messages.find((entry) => entry.id === "bot-narration")?.usage,
     ).toBeUndefined();
-    expect(withTerminalCreated?.messages.find((entry) => entry.id === "bot-terminal")?.usage).toEqual(
-      usage,
-    );
+    expect(
+      withTerminalCreated?.messages.find((entry) => entry.id === "bot-terminal")?.usage,
+    ).toEqual(usage);
   });
 
   it("stashes usage recorded before the first live bubble and carries it through", () => {
