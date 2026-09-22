@@ -628,5 +628,10 @@ describe("thread message pages", () => {
       outputTokens: 12,
     });
     expect(page.messages.find((message) => message.id === "message-user")?.usage).toBeUndefined();
+    expect(prisma.usageRecord.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      }),
+    );
   });
 });

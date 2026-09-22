@@ -181,7 +181,7 @@ async function withUsage(prisma: MessageDb, messages: ThreadMessage[]): Promise<
       inputTokens: true,
       outputTokens: true,
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
   const usageByRun = aggregateUsageRecords(rows);
   if (usageByRun.size === 0) return messages;

@@ -62,6 +62,9 @@ describe("MessageHoverUsage", () => {
     expect(html).toContain("group-focus-within/message:opacity-100");
     expect(html).toContain("start-0");
     expect(html).toContain("top-full");
+    expect(html).toContain("whitespace-nowrap");
+    expect(html).not.toContain("truncate");
+    expect(html).not.toContain("max-w-44");
     expect(html).not.toContain("end-0");
   });
 });
