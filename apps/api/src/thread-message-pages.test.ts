@@ -657,6 +657,12 @@ describe("thread message pages", () => {
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       }),
     );
+    expect(prisma.message.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { threadId: "thread-1", runId: { in: ["run-1"] }, role: "bot" },
+        orderBy: { seq: "desc" },
+      }),
+    );
   });
 
   it("does not attach run usage onto an older page that lacks the terminal reply", async () => {

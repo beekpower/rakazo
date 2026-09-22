@@ -46,7 +46,7 @@ export async function loadMessagePage(
       const messages = includePeerRuns ? rows : await withoutPeerRunMessages(prisma, rows);
       return {
         threadId,
-        messages: await withUsage(prisma, messages.map(toThreadMessage)),
+        messages: await withUsage(prisma, threadId, messages.map(toThreadMessage)),
         olderCursor: hasOlder ? (first?.seq ?? null) : null,
       };
     }
@@ -73,7 +73,7 @@ export async function loadMessagePage(
     if (hasSubstantive || includePeerReceipts || !hasOlder || includePeerRuns) {
       return {
         threadId,
-        messages: await withUsage(prisma, visibleRows.map(toThreadMessage)),
+        messages: await withUsage(prisma, threadId, visibleRows.map(toThreadMessage)),
         olderCursor: hasOlder ? (pageRows[0]?.seq ?? null) : null,
       };
     }
@@ -172,7 +172,11 @@ export function shouldForwardPeerThreadEvent(event: {
   );
 }
 
-async function withUsage(prisma: MessageDb, messages: ThreadMessage[]): Promise<ThreadMessage[]> {
+async function withUsage(
+  prisma: MessageDb,
+  threadId: string,
+  messages: ThreadMessage[],
+): Promise<ThreadMessage[]> {
   const runIds = [
     ...new Set(messages.flatMap((message) => (message.runId ? [message.runId] : []))),
   ];
@@ -194,7 +198,7 @@ async function withUsage(prisma: MessageDb, messages: ThreadMessage[]): Promise<
   // Prefer the thread-wide last bot message for each run so an older page that only
   // contains narration does not get the full run total.
   const terminalRows = await prisma.message.findMany({
-    where: { runId: { in: [...usageByRun.keys()] }, role: "bot" },
+    where: { threadId, runId: { in: [...usageByRun.keys()] }, role: "bot" },
     select: { id: true, runId: true, seq: true },
     orderBy: { seq: "desc" },
   });
