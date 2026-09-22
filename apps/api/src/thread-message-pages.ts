@@ -1,5 +1,5 @@
 import type { MessageBlock, ThreadMessage, ThreadMessagePage } from "@rakazo/contracts";
-import { aggregateUsageRecords, isPeerReceiptBlocks } from "@rakazo/core";
+import { aggregateUsageRecords, attachMessageUsageByRun, isPeerReceiptBlocks } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "@rakazo/db";
 
 type MessageDb = PrismaClient | Prisma.TransactionClient;
@@ -183,13 +183,7 @@ async function withUsage(prisma: MessageDb, messages: ThreadMessage[]): Promise<
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
-  const usageByRun = aggregateUsageRecords(rows);
-  if (usageByRun.size === 0) return messages;
-  return messages.map((message) => {
-    if (message.role !== "bot" || !message.runId) return message;
-    const usage = usageByRun.get(message.runId);
-    return usage ? { ...message, usage } : message;
-  });
+  return attachMessageUsageByRun(messages, aggregateUsageRecords(rows));
 }
 
 function toThreadMessage(row: {

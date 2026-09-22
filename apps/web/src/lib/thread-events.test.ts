@@ -405,6 +405,87 @@ describe("thread event reduction", () => {
     });
   });
 
+  it("keeps run usage on the terminal bot reply when a run has multiple bot messages", () => {
+    const usage = {
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 12,
+      outputTokens: 40,
+    };
+    const initial = snapshot([
+      {
+        ...message("bot-narration", [{ kind: "text", text: "Working." }], 4),
+        runId: "run-1",
+        usage,
+      },
+      {
+        ...message("subagent:research", [
+          {
+            kind: "subagent",
+            agentId: "research",
+            name: "Research",
+            task: "Find sources",
+            status: "running",
+          },
+        ]),
+        runId: "run-1",
+        usage,
+      },
+      {
+        ...message("bot-terminal", [{ kind: "text", text: "Done." }], 6),
+        runId: "run-1",
+      },
+    ]);
+
+    const recorded = reduceThreadSnapshot(
+      initial,
+      event({
+        type: "usage.recorded",
+        seq: 7,
+        runId: "run-1",
+        payload: { provider: "scripted", model: "scripted", inputTokens: 3, outputTokens: 1 },
+      }),
+    );
+
+    expect(recorded?.messages.find((entry) => entry.id === "bot-narration")?.usage).toBeUndefined();
+    expect(
+      recorded?.messages.find((entry) => entry.id === "subagent:research")?.usage,
+    ).toBeUndefined();
+    expect(recorded?.messages.find((entry) => entry.id === "bot-terminal")?.usage).toEqual({
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 15,
+      outputTokens: 41,
+    });
+
+    const withTerminalCreated = reduceThreadSnapshot(
+      snapshot([
+        {
+          ...message("bot-narration", [{ kind: "text", text: "Working." }], 4),
+          runId: "run-1",
+          usage,
+        },
+      ]),
+      event({
+        type: "thread.message.created",
+        seq: 5,
+        runId: "run-1",
+        payload: {
+          messageId: "bot-terminal",
+          role: "bot",
+          blocks: [{ kind: "text", text: "Done." }],
+          usage,
+        },
+      }),
+    );
+    expect(
+      withTerminalCreated?.messages.find((entry) => entry.id === "bot-narration")?.usage,
+    ).toBeUndefined();
+    expect(withTerminalCreated?.messages.find((entry) => entry.id === "bot-terminal")?.usage).toEqual(
+      usage,
+    );
+  });
+
   it("stashes usage recorded before the first live bubble and carries it through", () => {
     const usage = {
       provider: "scripted",

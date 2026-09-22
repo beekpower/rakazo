@@ -571,14 +571,25 @@ describe("thread message pages", () => {
     expect(findMany.mock.calls.map(([query]) => query.where.seq?.lt)).toEqual([undefined, 3, 1]);
   });
 
-  it("attaches aggregated usage_records onto bot messages by runId", async () => {
+  it("attaches aggregated usage_records onto the terminal bot message by runId", async () => {
     const findMany = vi.fn(async () => [
       {
-        id: "message-bot",
+        id: "message-terminal",
+        threadId: "thread-1",
+        seq: 3,
+        role: "bot",
+        blocks: [{ kind: "text", text: "Done." }],
+        botId: "bot-1",
+        replyToMessageId: null,
+        runId: "run-1",
+        createdAt: new Date("2026-08-16T00:00:03.000Z"),
+      },
+      {
+        id: "message-narration",
         threadId: "thread-1",
         seq: 2,
         role: "bot",
-        blocks: [{ kind: "text", text: "Done." }],
+        blocks: [{ kind: "text", text: "Working." }],
         botId: "bot-1",
         replyToMessageId: null,
         runId: "run-1",
@@ -619,14 +630,17 @@ describe("thread message pages", () => {
       run: { findMany: vi.fn(async () => []) },
     } as unknown as PrismaClient;
 
-    const page = await loadMessagePage(prisma, "thread-1", undefined, 2);
+    const page = await loadMessagePage(prisma, "thread-1", undefined, 3);
 
-    expect(page.messages.find((message) => message.id === "message-bot")?.usage).toEqual({
+    expect(page.messages.find((message) => message.id === "message-terminal")?.usage).toEqual({
       provider: "",
       model: "",
       inputTokens: 12,
       outputTokens: 12,
     });
+    expect(
+      page.messages.find((message) => message.id === "message-narration")?.usage,
+    ).toBeUndefined();
     expect(page.messages.find((message) => message.id === "message-user")?.usage).toBeUndefined();
     expect(prisma.usageRecord.findMany).toHaveBeenCalledWith(
       expect.objectContaining({

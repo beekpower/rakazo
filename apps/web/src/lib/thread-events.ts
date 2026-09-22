@@ -11,6 +11,7 @@ import type {
 import {
   addMessageUsage,
   applyMessageUsageByRunId,
+  concentrateMessageUsageByRunId,
   isActive,
   isMessageUsage,
   isRunTerminalEvent,
@@ -509,7 +510,11 @@ export function reduceThreadSnapshot(
         without.push(message);
       }
     }
-    return { ...prev, cursor: event.seq, messages: [...without, next, ...kept] };
+    return {
+      ...prev,
+      cursor: event.seq,
+      messages: concentrateMessageUsageByRunId([...without, next, ...kept], event.runId),
+    };
   }
 
   if (event.type === "thread.cloud_agent") {
@@ -563,7 +568,11 @@ export function reduceThreadSnapshot(
       blocks.filter((block) => block.kind === "subagent").map((block) => block.agentId),
     );
     const without = remaining.filter((message) => !replacedSubagent(message, replacedSubagentIds));
-    return { ...prev, cursor: event.seq, messages: upsertMessageById(without, next) };
+    return {
+      ...prev,
+      cursor: event.seq,
+      messages: concentrateMessageUsageByRunId(upsertMessageById(without, next), event.runId),
+    };
   }
   return prev;
 }

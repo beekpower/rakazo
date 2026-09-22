@@ -3,6 +3,9 @@ import {
   addMessageUsage,
   aggregateUsageRecords,
   applyMessageUsageByRunId,
+  attachMessageUsageByRun,
+  concentrateMessageUsageByRunId,
+  findMessageUsageTargetIndex,
   isMessageUsage,
 } from "./message-usage.js";
 
@@ -85,7 +88,19 @@ describe("message usage", () => {
     });
   });
 
-  it("applies run usage only to bot messages with that run", () => {
+  it("applies run usage only to the terminal bot message for that run", () => {
+    const loaded = {
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 12,
+      outputTokens: 40,
+    };
+    const extra = {
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 3,
+      outputTokens: 1,
+    };
     const messages = [
       {
         id: "user-1",
@@ -97,36 +112,187 @@ describe("message usage", () => {
         createdAt: "2026-09-22T00:00:00.000Z",
       },
       {
-        id: "bot-1",
+        id: "bot-narration",
         threadId: "thread-1",
         seq: 2,
         role: "bot" as const,
-        blocks: [],
+        blocks: [{ kind: "text" as const, text: "Working on it." }],
         runId: "run-1",
         createdAt: "2026-09-22T00:00:01.000Z",
       },
       {
-        id: "bot-2",
+        id: "subagent:research",
         threadId: "thread-1",
         seq: 3,
         role: "bot" as const,
-        blocks: [],
-        runId: "run-2",
+        blocks: [
+          {
+            kind: "subagent" as const,
+            agentId: "research",
+            name: "Research",
+            task: "Find sources",
+            status: "running" as const,
+          },
+        ],
+        runId: "run-1",
+        usage: loaded,
         createdAt: "2026-09-22T00:00:02.000Z",
       },
+      {
+        id: "bot-terminal",
+        threadId: "thread-1",
+        seq: 4,
+        role: "bot" as const,
+        blocks: [{ kind: "text" as const, text: "Done." }],
+        runId: "run-1",
+        createdAt: "2026-09-22T00:00:03.000Z",
+      },
+      {
+        id: "bot-other-run",
+        threadId: "thread-1",
+        seq: 5,
+        role: "bot" as const,
+        blocks: [],
+        runId: "run-2",
+        createdAt: "2026-09-22T00:00:04.000Z",
+      },
     ];
+
+    expect(findMessageUsageTargetIndex(messages, "run-1")).toBe(3);
+
+    const next = applyMessageUsageByRunId(messages, "run-1", extra);
+
+    expect(next[0]).toBe(messages[0]);
+    expect(next[1]).toEqual(messages[1]);
+    expect(next[2]).not.toHaveProperty("usage");
+    expect(next[3]).toMatchObject({
+      id: "bot-terminal",
+      usage: {
+        provider: "scripted",
+        model: "scripted",
+        inputTokens: 15,
+        outputTokens: 41,
+      },
+    });
+    expect(next[4]).toBe(messages[4]);
+    expect(applyMessageUsageByRunId(messages, undefined, extra)).toBe(messages);
+  });
+
+  it("falls back to the live bubble when no durable reply exists yet", () => {
     const usage = {
       provider: "scripted",
       model: "scripted",
       inputTokens: 12,
       outputTokens: 40,
     };
+    const messages = [
+      {
+        id: "progress:run-1",
+        threadId: "thread-1",
+        seq: 2,
+        role: "bot" as const,
+        blocks: [{ kind: "progress" as const, text: "working…" }],
+        runId: "run-1",
+        createdAt: "2026-09-22T00:00:01.000Z",
+      },
+      {
+        id: "subagent:research",
+        threadId: "thread-1",
+        seq: 3,
+        role: "bot" as const,
+        blocks: [
+          {
+            kind: "subagent" as const,
+            agentId: "research",
+            name: "Research",
+            task: "Find sources",
+            status: "running" as const,
+          },
+        ],
+        runId: "run-1",
+        createdAt: "2026-09-22T00:00:02.000Z",
+      },
+    ];
 
-    const next = applyMessageUsageByRunId(messages, "run-1", usage);
+    expect(findMessageUsageTargetIndex(messages, "run-1")).toBe(1);
+    expect(applyMessageUsageByRunId(messages, "run-1", usage)[1]).toMatchObject({
+      id: "subagent:research",
+      usage,
+    });
+  });
 
-    expect(next[0]).toBe(messages[0]);
-    expect(next[1]).toMatchObject({ id: "bot-1", usage });
-    expect(next[2]).toBe(messages[2]);
-    expect(applyMessageUsageByRunId(messages, undefined, usage)).toBe(messages);
+  it("attaches aggregated usage to one target message per run", () => {
+    const usageByRun = new Map([
+      [
+        "run-1",
+        {
+          provider: "scripted",
+          model: "scripted",
+          inputTokens: 12,
+          outputTokens: 40,
+        },
+      ],
+    ]);
+    const messages = [
+      {
+        id: "bot-narration",
+        threadId: "thread-1",
+        seq: 1,
+        role: "bot" as const,
+        blocks: [{ kind: "text" as const, text: "Working." }],
+        runId: "run-1",
+        createdAt: "2026-09-22T00:00:01.000Z",
+      },
+      {
+        id: "bot-terminal",
+        threadId: "thread-1",
+        seq: 2,
+        role: "bot" as const,
+        blocks: [{ kind: "text" as const, text: "Done." }],
+        runId: "run-1",
+        createdAt: "2026-09-22T00:00:02.000Z",
+      },
+    ];
+
+    const next = attachMessageUsageByRun(messages, usageByRun);
+    expect(next[0]).toEqual(messages[0]);
+    expect(next[1]).toMatchObject({
+      id: "bot-terminal",
+      usage: usageByRun.get("run-1"),
+    });
+  });
+
+  it("moves usage onto the terminal reply when concentrating a run", () => {
+    const usage = {
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 12,
+      outputTokens: 40,
+    };
+    const messages = [
+      {
+        id: "bot-narration",
+        threadId: "thread-1",
+        seq: 1,
+        role: "bot" as const,
+        blocks: [{ kind: "text" as const, text: "Working." }],
+        runId: "run-1",
+        usage,
+        createdAt: "2026-09-22T00:00:01.000Z",
+      },
+      {
+        id: "bot-terminal",
+        threadId: "thread-1",
+        seq: 2,
+        role: "bot" as const,
+        blocks: [{ kind: "text" as const, text: "Done." }],
+        runId: "run-1",
+        createdAt: "2026-09-22T00:00:02.000Z",
+      },
+    ];
+
+    const next = concentrateMessageUsageByRunId(messages, "run-1");
+    expect(next[0]).not.toHaveProperty("usage");
+    expect(next[1]).toMatchObject({ id: "bot-terminal", usage });
   });
 });
