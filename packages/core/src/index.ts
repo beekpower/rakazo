@@ -25,6 +25,7 @@ export * from "./markdown-plain.js";
 export * from "./mcp.js";
 export * from "./message-pages.js";
 export * from "./message-reactions.js";
+export * from "./message-usage.js";
 export * from "./message-visibility.js";
 export * from "./messaging-commands.js";
 export * from "./messaging-prompts.js";

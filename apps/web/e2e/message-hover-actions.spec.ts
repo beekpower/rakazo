@@ -271,6 +271,29 @@ test("message hover shows beside-bubble actions; reply links to parent", async (
   await captureScreenshot(page, testInfo, "message-user-actions-mobile");
 });
 
+test("bot message hover reveals model and token usage", async ({ page }, testInfo) => {
+  const stamp = Date.now();
+  await signup(page, `hover-usage-${stamp}@rakazo.test`, "password12", "Hover Usage");
+  await completeOnboarding(page);
+
+  const composer = page.getByRole("combobox", { name: /^Message/ });
+  await expect(composer).toBeVisible();
+  await sendComposerMessage(page, composer, `remember hover-usage-${stamp}`);
+
+  const transcript = page.getByTestId("transcript");
+  const botText = page.getByText("noted — i will keep that in memory.");
+  await expect(botText).toBeVisible({ timeout: 20_000 });
+  const botRow = transcript.locator("[data-message-id]").filter({ has: botText }).first();
+  const usage = botRow.getByTestId("message-hover-usage");
+  await expect(usage).toBeAttached({ timeout: 20_000 });
+  await expect(usage).toHaveText(/scripted · 12 in · 40 out/);
+  await expect(usage).toHaveCSS("opacity", "0");
+
+  await revealHoverRail(botRow);
+  await expect(usage).toHaveCSS("opacity", "1");
+  await captureScreenshot(page, testInfo, "message-bot-usage-hover-desktop");
+});
+
 test("reply preview jumps to parent outside the loaded page", async ({ page }) => {
   const stamp = Date.now();
   await signup(page, `hover-page-${stamp}@rakazo.test`, "password12", "Hover Page");

@@ -20,6 +20,7 @@ import {
   ReorderBotsInput,
   RunActivityRowSchema,
   RunSchema,
+  ThreadMessageSchema,
   UpdateBotInput,
   UpdateGroupInput,
 } from "./index.js";
@@ -230,6 +231,32 @@ describe("contracts", () => {
     expect(ProductEventType.options).toContain("thread.cleared");
     expect(ProductEventType.options).toContain("thread.subagent");
     expect(ProductEventType.options).toContain("bot.spawned");
+    expect(ProductEventType.options).toContain("usage.recorded");
+  });
+
+  it("accepts optional per-run usage on a thread message", () => {
+    expect(
+      ThreadMessageSchema.parse({
+        id: "message-1",
+        threadId: "thread-1",
+        seq: 1,
+        role: "bot",
+        blocks: [{ kind: "text", text: "Hi" }],
+        runId: "run-1",
+        usage: {
+          provider: "scripted",
+          model: "scripted",
+          inputTokens: 12,
+          outputTokens: 40,
+        },
+        createdAt: "2026-09-22T00:00:00.000Z",
+      }).usage,
+    ).toEqual({
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 12,
+      outputTokens: 40,
+    });
   });
 
   it("requires a distinct, non-empty bot order", () => {

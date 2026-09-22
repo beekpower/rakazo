@@ -4071,6 +4071,19 @@ export function createRunExecutor(deps: ExecutorDeps) {
                   outputTokens: event.outputTokens,
                 },
               });
+              await deps.events.append({
+                spaceId: run.spaceId,
+                threadId: thread.id,
+                botId: bot.id,
+                type: "usage.recorded",
+                runId,
+                payload: {
+                  provider: event.provider,
+                  model: event.model,
+                  inputTokens: event.inputTokens,
+                  outputTokens: event.outputTokens,
+                },
+              });
             } else if (event.type === "done") {
               if (!assembled && event.text) {
                 if (publishedMidTurnUserMessage) {

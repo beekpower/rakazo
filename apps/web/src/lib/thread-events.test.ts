@@ -344,6 +344,65 @@ describe("thread event reduction", () => {
     expect(isThreadSnapshotEvent(event({ type: "run.completed" }))).toBe(true);
     expect(isThreadSnapshotEvent(event({ type: "computer.takeover.requested" }))).toBe(true);
     expect(isThreadSnapshotEvent(event({ type: "agent.tool.completed" }))).toBe(true);
+    expect(isThreadSnapshotEvent(event({ type: "usage.recorded" }))).toBe(true);
+  });
+
+  it("attaches run usage to live bot messages and carries it onto the durable reply", () => {
+    const initial = snapshot([
+      {
+        ...message("progress:run-1", [{ kind: "progress", text: "working…" }], 4),
+        runId: "run-1",
+      },
+    ]);
+    const usage = {
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 12,
+      outputTokens: 40,
+    };
+
+    const recorded = reduceThreadSnapshot(
+      initial,
+      event({
+        type: "usage.recorded",
+        seq: 5,
+        runId: "run-1",
+        payload: usage,
+      }),
+    );
+    expect(recorded?.messages.find((entry) => entry.id === "progress:run-1")?.usage).toEqual(usage);
+
+    const durable = reduceThreadSnapshot(
+      recorded,
+      event({
+        type: "thread.message.created",
+        seq: 6,
+        runId: "run-1",
+        payload: {
+          messageId: "bot-1",
+          role: "bot",
+          blocks: [{ kind: "text", text: "Done." }],
+        },
+      }),
+    );
+    expect(durable?.messages.find((entry) => entry.id === "bot-1")?.usage).toEqual(usage);
+    expect(durable?.messages.some((entry) => entry.id === "progress:run-1")).toBe(false);
+
+    const summed = reduceThreadSnapshot(
+      durable,
+      event({
+        type: "usage.recorded",
+        seq: 7,
+        runId: "run-1",
+        payload: { provider: "scripted", model: "scripted", inputTokens: 3, outputTokens: 1 },
+      }),
+    );
+    expect(summed?.messages.find((entry) => entry.id === "bot-1")?.usage).toEqual({
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 15,
+      outputTokens: 41,
+    });
   });
 
   it("event-sources the active run on run.started so Stop does not wait on threads.get", () => {

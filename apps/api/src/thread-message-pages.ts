@@ -1,5 +1,5 @@
 import type { MessageBlock, ThreadMessage, ThreadMessagePage } from "@rakazo/contracts";
-import { isPeerReceiptBlocks } from "@rakazo/core";
+import { aggregateUsageRecords, isPeerReceiptBlocks } from "@rakazo/core";
 import type { Prisma, PrismaClient } from "@rakazo/db";
 
 type MessageDb = PrismaClient | Prisma.TransactionClient;
@@ -41,7 +41,7 @@ export async function loadMessagePage(
       const messages = includePeerRuns ? rows : await withoutPeerRunMessages(prisma, rows);
       return {
         threadId,
-        messages: messages.map(toThreadMessage),
+        messages: await withUsage(prisma, messages.map(toThreadMessage)),
         olderCursor: hasOlder ? (first?.seq ?? null) : null,
       };
     }
@@ -68,7 +68,7 @@ export async function loadMessagePage(
     if (hasSubstantive || includePeerReceipts || !hasOlder || includePeerRuns) {
       return {
         threadId,
-        messages: visibleRows.map(toThreadMessage),
+        messages: await withUsage(prisma, visibleRows.map(toThreadMessage)),
         olderCursor: hasOlder ? (pageRows[0]?.seq ?? null) : null,
       };
     }
@@ -165,6 +165,31 @@ export function shouldForwardPeerThreadEvent(event: {
           block.kind === "text"),
     )
   );
+}
+
+async function withUsage(prisma: MessageDb, messages: ThreadMessage[]): Promise<ThreadMessage[]> {
+  const runIds = [
+    ...new Set(messages.flatMap((message) => (message.runId ? [message.runId] : []))),
+  ];
+  if (runIds.length === 0) return messages;
+  const rows = await prisma.usageRecord.findMany({
+    where: { runId: { in: runIds } },
+    select: {
+      runId: true,
+      provider: true,
+      model: true,
+      inputTokens: true,
+      outputTokens: true,
+    },
+    orderBy: { createdAt: "asc" },
+  });
+  const usageByRun = aggregateUsageRecords(rows);
+  if (usageByRun.size === 0) return messages;
+  return messages.map((message) => {
+    if (message.role !== "bot" || !message.runId) return message;
+    const usage = usageByRun.get(message.runId);
+    return usage ? { ...message, usage } : message;
+  });
 }
 
 function toThreadMessage(row: {

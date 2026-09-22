@@ -282,6 +282,14 @@ export const ProductEventSchema = z.object({
 });
 export type ProductEvent = z.infer<typeof ProductEventSchema>;
 
+export const MessageUsageSchema = z.object({
+  provider: z.string(),
+  model: z.string(),
+  inputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+});
+export type MessageUsage = z.infer<typeof MessageUsageSchema>;
+
 export const ThreadMessageSchema = z.object({
   id: Id,
   threadId: Id,
@@ -292,6 +300,7 @@ export const ThreadMessageSchema = z.object({
   replyToMessageId: Id.optional(),
   replyQuote: z.string().optional(),
   runId: Id.optional(),
+  usage: MessageUsageSchema.optional(),
   createdAt: z.string(),
 });
 export type ThreadMessage = z.infer<typeof ThreadMessageSchema>;

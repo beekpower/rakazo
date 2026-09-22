@@ -8,7 +8,9 @@ import type {
   ThreadSnapshot,
 } from "@rakazo/contracts";
 import {
+  applyMessageUsageByRunId,
   isActive,
+  isMessageUsage,
   isRunTerminalEvent,
   mergeThreadHistory,
   prependThreadHistoryPage,
@@ -254,6 +256,7 @@ export function isThreadSnapshotEvent(event: ProductEvent): boolean {
     event.type === "run.started" ||
     event.type === "run.waiting_input" ||
     event.type === "computer.takeover.requested" ||
+    event.type === "usage.recorded" ||
     isRunTerminalEvent(event)
   );
 }
@@ -473,9 +476,24 @@ export function reduceThreadSnapshot(
       messages: updateCloudAgentMessages(prev.messages, event.payload ?? {}),
     };
   }
+  if (event.type === "usage.recorded") {
+    if (!isMessageUsage(event.payload) || !event.runId) {
+      return { ...prev, cursor: event.seq };
+    }
+    return {
+      ...prev,
+      cursor: event.seq,
+      messages: applyMessageUsageByRunId(prev.messages, event.runId, event.payload),
+    };
+  }
   if (event.type === "thread.message.created" || event.type === "thread.message.updated") {
     const role = (event.payload.role as ThreadMessage["role"]) ?? "bot";
     const blocks = (event.payload.blocks as ThreadMessage["blocks"]) ?? [];
+    const liveId = progressMessageId(event);
+    const { previous, remaining } = takeLiveMessage(prev.messages, liveId);
+    const existing = remaining.find(
+      (message) => message.id === String(event.payload.messageId ?? event.id),
+    );
     const next: ThreadMessage = {
       id: String(event.payload.messageId ?? event.id),
       threadId: event.threadId,
@@ -490,13 +508,15 @@ export function reduceThreadSnapshot(
           : undefined,
       replyQuote:
         typeof event.payload.replyQuote === "string" ? event.payload.replyQuote : undefined,
+      usage:
+        (isMessageUsage(event.payload.usage) ? event.payload.usage : undefined) ??
+        previous?.usage ??
+        existing?.usage,
       createdAt: event.createdAt,
     };
     const replacedSubagentIds = new Set(
       blocks.filter((block) => block.kind === "subagent").map((block) => block.agentId),
     );
-    const liveId = progressMessageId(event);
-    const { remaining } = takeLiveMessage(prev.messages, liveId);
     const without = remaining.filter((message) => !replacedSubagent(message, replacedSubagentIds));
     return { ...prev, cursor: event.seq, messages: upsertMessageById(without, next) };
   }

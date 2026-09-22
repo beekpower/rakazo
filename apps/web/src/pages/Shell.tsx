@@ -138,7 +138,7 @@ import {
   computersAreUnavailable,
 } from "../components/ComputersUnavailableHint";
 import { ComputerUpdateProgress } from "../components/ComputerUpdateProgress";
-import { MessageHoverMetadata } from "../components/MessageHoverMetadata";
+import { MessageHoverMetadata, MessageHoverUsage } from "../components/MessageHoverMetadata";
 import { SkillDraftCard } from "../components/teach/SkillDraftCard";
 import { TeachCaptureOverlay } from "../components/teach/TeachCaptureOverlay";
 import { TeachComputerOverlayControl } from "../components/teach/TeachComputerOverlay";
@@ -4604,6 +4604,13 @@ const Transcript = memo(function Transcript({
           if (!message.blocks.some((block) => !isToolActivityBlock(block))) return null;
           const peerReceipt = isPeerReceiptBlocks(message.blocks);
           const messageReactions = reactionView.reactions.get(message.id);
+          const usage = message.usage;
+          const usageInput = usage?.inputTokens.toLocaleString(i18n.locale || "en");
+          const usageOutput = usage?.outputTokens.toLocaleString(i18n.locale || "en");
+          const usageLabel =
+            message.role === "bot" && usage && usageInput && usageOutput
+              ? t`${usage.model} · ${usageInput} in · ${usageOutput} out`
+              : null;
           return (
             <div
               key={message.id}
@@ -4624,6 +4631,9 @@ const Transcript = memo(function Transcript({
                     minute: "2-digit",
                   })}
                 </time>
+              ) : null}
+              {usageLabel && !peerReceipt && !message.id.startsWith("progress:") ? (
+                <MessageHoverUsage>{usageLabel}</MessageHoverUsage>
               ) : null}
               <div
                 className={

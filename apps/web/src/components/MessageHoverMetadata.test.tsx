@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { MessageHoverMetadata } from "./MessageHoverMetadata";
+import { MessageHoverMetadata, MessageHoverUsage } from "./MessageHoverMetadata";
 
 describe("MessageHoverMetadata", () => {
   it("places bot actions flush to the right of the bubble", () => {
@@ -46,5 +46,22 @@ describe("MessageHoverMetadata", () => {
 
     expect(html).toContain("pointer-events-auto opacity-100");
     expect(html).not.toContain("group-hover/message:opacity-100");
+  });
+});
+
+describe("MessageHoverUsage", () => {
+  it("reveals model and token counts on demand at the bot time edge", () => {
+    const html = renderToStaticMarkup(
+      <MessageHoverUsage>scripted · 12 in · 40 out</MessageHoverUsage>,
+    );
+
+    expect(html).toContain('data-testid="message-hover-usage"');
+    expect(html).toContain("scripted · 12 in · 40 out");
+    expect(html).toContain("opacity-0");
+    expect(html).toContain("group-hover/message:opacity-100");
+    expect(html).toContain("group-focus-within/message:opacity-100");
+    expect(html).toContain("end-0");
+    expect(html).toContain("top-6");
+    expect(html).not.toContain("start-0");
   });
 });
