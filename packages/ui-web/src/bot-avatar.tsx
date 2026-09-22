@@ -14,6 +14,7 @@ import {
   shippedBotAvatarShapePath,
   shippedHash,
 } from "@rakazo/core";
+import { tokens } from "@rakazo/ui-tokens";
 import type { CSSProperties } from "react";
 import { memo, useId, useMemo, useSyncExternalStore } from "react";
 import type { AvatarStyle } from "./avatar-style.js";
@@ -160,7 +161,7 @@ export const BotAvatar = memo(function BotAvatar({
   if (parsed.shapeIndex === undefined && (variant ?? preferredVariant) === "organic") {
     return (
       <OrganicAvatar
-        color={parsed.color}
+        color={colorDef.hex}
         identity={effectiveId}
         size={size}
         isWorking={isWorking}
@@ -264,7 +265,7 @@ function OrganicAvatar({
     reducedMotionSnapshot,
     () => false,
   );
-  const seed = avatarIdentitySeed(identity || color || "#8B5CF6");
+  const seed = avatarIdentitySeed(identity || color || DEFAULT_GROK_BOT_COLOR);
   const duration = `${4.8 + (seed % 24) / 10}s`;
   const shapeA = organicAvatarPath(seed);
   const shapeB = organicAvatarPath(seed, 0.42);
@@ -314,7 +315,7 @@ function OrganicAvatar({
           <g
             key={mode}
             className={`rakazo-organic-avatar-eyes rakazo-organic-avatar-eyes-${mode}`}
-            fill="#101014"
+            fill={tokens.background}
           >
             <rect x="-14" y="-12" width="7" height="24" rx="3.5" />
             <rect x="7" y="-12" width="7" height="24" rx="3.5" />

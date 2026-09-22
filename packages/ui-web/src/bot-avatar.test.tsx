@@ -43,7 +43,7 @@ describe("BotAvatar", () => {
 
   it("renders a geometric mascot for plain color values", () => {
     const html = renderToString(
-      <BotAvatar color="#D9508A" identity="maya" size={28} status="running" />,
+      <BotAvatar color={DEFAULT_GROK_BOT_COLOR} identity="maya" size={28} status="running" />,
     );
     expect(html).toContain("<svg");
     expect(html).toContain("<path");
@@ -52,8 +52,8 @@ describe("BotAvatar", () => {
   });
 
   it("renders distinct shapes for distinct bot identities", () => {
-    const maya = renderToString(<BotAvatar color="#D9508A" identity="maya" />);
-    const github = renderToString(<BotAvatar color="#D9508A" identity="github" />);
+    const maya = renderToString(<BotAvatar color={DEFAULT_GROK_BOT_COLOR} identity="maya" />);
+    const github = renderToString(<BotAvatar color={DEFAULT_GROK_BOT_COLOR} identity="github" />);
     expect(maya).not.toEqual(github);
   });
 
@@ -126,10 +126,10 @@ describe("BotAvatar", () => {
 
   it("renders distinct robot and organic previews for the same identity", () => {
     const robot = renderToString(
-      <BotAvatar color="#D9508A" identity="avatar-style-preview" variant="robot" />,
+      <BotAvatar color={DEFAULT_GROK_BOT_COLOR} identity="avatar-style-preview" variant="robot" />,
     );
     const organic = renderToString(
-      <BotAvatar color="#D9508A" identity="avatar-style-preview" variant="organic" />,
+      <BotAvatar color={DEFAULT_GROK_BOT_COLOR} identity="avatar-style-preview" variant="organic" />,
     );
     expect(robot).not.toEqual(organic);
     expect(robot).toContain("grok-character-eyes");
@@ -140,7 +140,7 @@ describe("BotAvatar", () => {
   it("uses the preferred avatar style when variant is omitted", () => {
     const html = renderToString(
       <AvatarStyleProvider value="organic">
-        <BotAvatar color="#D9508A" identity="maya" />
+        <BotAvatar color={DEFAULT_GROK_BOT_COLOR} identity="maya" />
       </AvatarStyleProvider>,
     );
     expect(html).toContain("rakazo-organic-avatar");
@@ -161,5 +161,15 @@ describe("BotAvatar", () => {
     );
     expect(html).toContain("grok-character-eyes");
     expect(html).not.toContain("rakazo-organic-avatar");
+  });
+
+  it("fills the organic body with the resolved palette hex when the custom color is invalid", () => {
+    const fallback = resolvePersonaColorDef("maya", "#zzzzzz");
+    const html = renderToString(
+      <BotAvatar color="#zzzzzz" identity="maya" variant="organic" />,
+    );
+    expect(html).toContain("rakazo-organic-avatar");
+    expect(html).toContain(`fill="${fallback.hex}"`);
+    expect(html).not.toContain("#zzzzzz");
   });
 });
