@@ -50,7 +50,7 @@ describe("MessageHoverMetadata", () => {
 });
 
 describe("MessageHoverUsage", () => {
-  it("reveals model and token counts on demand at the bot time edge", () => {
+  it("reveals model and token counts under the bot bubble on demand", () => {
     const html = renderToStaticMarkup(
       <MessageHoverUsage>scripted · 12 in · 40 out</MessageHoverUsage>,
     );
@@ -60,8 +60,8 @@ describe("MessageHoverUsage", () => {
     expect(html).toContain("opacity-0");
     expect(html).toContain("group-hover/message:opacity-100");
     expect(html).toContain("group-focus-within/message:opacity-100");
-    expect(html).toContain("end-0");
-    expect(html).toContain("top-6");
-    expect(html).not.toContain("start-0");
+    expect(html).toContain("start-0");
+    expect(html).toContain("top-full");
+    expect(html).not.toContain("end-0");
   });
 });

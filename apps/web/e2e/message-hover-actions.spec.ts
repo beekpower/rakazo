@@ -275,6 +275,11 @@ test("bot message hover reveals model and token usage", async ({ page }, testInf
   const stamp = Date.now();
   await signup(page, `hover-usage-${stamp}@rakazo.test`, "password12", "Hover Usage");
   await completeOnboarding(page);
+  await expect(page.getByText("What do you want me on first?", { exact: true })).toBeVisible({
+    timeout: 20_000,
+  });
+  await page.getByRole("button", { name: /Day-to-day work/ }).click();
+  await expect(page.getByText(/Got it\./)).toBeVisible({ timeout: 20_000 });
 
   const composer = page.getByRole("combobox", { name: /^Message/ });
   await expect(composer).toBeVisible();

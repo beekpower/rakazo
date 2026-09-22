@@ -4632,9 +4632,6 @@ const Transcript = memo(function Transcript({
                   })}
                 </time>
               ) : null}
-              {usageLabel && !peerReceipt && !message.id.startsWith("progress:") ? (
-                <MessageHoverUsage>{usageLabel}</MessageHoverUsage>
-              ) : null}
               <div
                 className={
                   peerReceipt
@@ -4693,6 +4690,9 @@ const Transcript = memo(function Transcript({
                     onSpeak={() => onSpeak(message)}
                     onOpenComputer={onOpenComputer}
                   />
+                  {usageLabel && !peerReceipt && !message.id.startsWith("progress:") ? (
+                    <MessageHoverUsage>{usageLabel}</MessageHoverUsage>
+                  ) : null}
                 </div>
               </div>
               {!peerReceipt && messageReactions ? (
