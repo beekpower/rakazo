@@ -4609,7 +4609,9 @@ const Transcript = memo(function Transcript({
           const usageOutput = usage?.outputTokens.toLocaleString(i18n.locale || "en");
           const usageLabel =
             message.role === "bot" && usage && usageInput && usageOutput
-              ? t`${usage.model} · ${usageInput} in · ${usageOutput} out`
+              ? usage.model
+                ? t`${usage.model} · ${usageInput} in · ${usageOutput} out`
+                : t`${usageInput} in · ${usageOutput} out`
               : null;
           return (
             <div

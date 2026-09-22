@@ -405,6 +405,83 @@ describe("thread event reduction", () => {
     });
   });
 
+  it("stashes usage recorded before the first live bubble and carries it through", () => {
+    const usage = {
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 12,
+      outputTokens: 40,
+    };
+    const recorded = reduceThreadSnapshot(
+      snapshot([]),
+      event({
+        type: "usage.recorded",
+        seq: 4,
+        runId: "run-1",
+        payload: usage,
+      }),
+    );
+    expect(recorded?.messages).toEqual([]);
+
+    const progressed = reduceThreadSnapshot(
+      recorded,
+      event({
+        type: "thread.progress",
+        seq: 5,
+        runId: "run-1",
+        payload: { delta: "working…" },
+      }),
+    );
+    expect(progressed?.messages.find((entry) => entry.id === "progress:run-1")?.usage).toEqual(
+      usage,
+    );
+
+    const continued = reduceThreadSnapshot(
+      progressed,
+      event({
+        type: "thread.progress",
+        seq: 6,
+        runId: "run-1",
+        payload: { delta: " still" },
+      }),
+    );
+    expect(continued?.messages.find((entry) => entry.id === "progress:run-1")?.usage).toEqual(
+      usage,
+    );
+
+    const durable = reduceThreadSnapshot(
+      continued,
+      event({
+        type: "thread.message.created",
+        seq: 7,
+        runId: "run-1",
+        payload: {
+          messageId: "bot-1",
+          role: "bot",
+          blocks: [{ kind: "text", text: "Done." }],
+        },
+      }),
+    );
+    expect(durable?.messages.find((entry) => entry.id === "bot-1")?.usage).toEqual(usage);
+
+    const withoutProgress = reduceThreadSnapshot(
+      recorded,
+      event({
+        type: "thread.message.created",
+        seq: 5,
+        runId: "run-1",
+        payload: {
+          messageId: "bot-direct",
+          role: "bot",
+          blocks: [{ kind: "text", text: "Done." }],
+        },
+      }),
+    );
+    expect(withoutProgress?.messages.find((entry) => entry.id === "bot-direct")?.usage).toEqual(
+      usage,
+    );
+  });
+
   it("event-sources the active run on run.started so Stop does not wait on threads.get", () => {
     const initial = snapshot([]);
     const started = reduceThreadSnapshot(

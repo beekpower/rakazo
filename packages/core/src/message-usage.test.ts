@@ -22,8 +22,8 @@ describe("message usage", () => {
     ).toBe(false);
   });
 
-  it("keeps the latest model and sums tokens across records for a run", () => {
-    const byRun = aggregateUsageRecords([
+  it("sums tokens for a run and blanks model when records disagree", () => {
+    const mixed = aggregateUsageRecords([
       {
         runId: "run-1",
         provider: "openai",
@@ -46,12 +46,34 @@ describe("message usage", () => {
         outputTokens: 99,
       },
     ]);
+    const same = aggregateUsageRecords([
+      {
+        runId: "run-2",
+        provider: "scripted",
+        model: "scripted",
+        inputTokens: 12,
+        outputTokens: 40,
+      },
+      {
+        runId: "run-2",
+        provider: "scripted",
+        model: "scripted",
+        inputTokens: 3,
+        outputTokens: 1,
+      },
+    ]);
 
-    expect(byRun.get("run-1")).toEqual({
-      provider: "openai",
-      model: "gpt-4.1-mini",
+    expect(mixed.get("run-1")).toEqual({
+      provider: "",
+      model: "",
       inputTokens: 12,
       outputTokens: 12,
+    });
+    expect(same.get("run-2")).toEqual({
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 15,
+      outputTokens: 41,
     });
     expect(
       addMessageUsage(undefined, { provider: "x", model: "y", inputTokens: 1, outputTokens: 2 }),

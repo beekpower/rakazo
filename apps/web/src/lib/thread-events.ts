@@ -1,5 +1,6 @@
 import type {
   ComputerStatus,
+  MessageUsage,
   ProductEvent,
   Run,
   RunStatus,
@@ -8,6 +9,7 @@ import type {
   ThreadSnapshot,
 } from "@rakazo/contracts";
 import {
+  addMessageUsage,
   applyMessageUsageByRunId,
   isActive,
   isMessageUsage,
@@ -22,6 +24,42 @@ import {
   updateCloudAgentMessages,
   upsertMessageById,
 } from "@rakazo/core";
+
+/** Live-only stash for usage.recorded that arrives before the first bot bubble. */
+type LiveThreadSnapshot = ThreadSnapshot & {
+  pendingUsageByRunId?: Record<string, MessageUsage>;
+};
+
+function pendingUsageForRun(
+  snapshot: ThreadSnapshot,
+  runId: string | undefined,
+): MessageUsage | undefined {
+  if (!runId) return undefined;
+  return (snapshot as LiveThreadSnapshot).pendingUsageByRunId?.[runId];
+}
+
+function withPendingUsage(
+  snapshot: ThreadSnapshot,
+  runId: string,
+  usage: MessageUsage,
+): LiveThreadSnapshot {
+  const pending = (snapshot as LiveThreadSnapshot).pendingUsageByRunId ?? {};
+  return {
+    ...snapshot,
+    pendingUsageByRunId: {
+      ...pending,
+      [runId]: addMessageUsage(pending[runId], usage),
+    },
+  };
+}
+
+function usageForLiveMessage(
+  snapshot: ThreadSnapshot,
+  previous: ThreadMessage | undefined,
+  runId: string | undefined,
+): MessageUsage | undefined {
+  return previous?.usage ?? pendingUsageForRun(snapshot, runId);
+}
 
 const runTriggers = new Set<Run["trigger"]>([
   "user",
@@ -267,8 +305,9 @@ export function reduceThreadSnapshot(
 ): ThreadSnapshot | null {
   if (!prev) return prev;
   if (event.type === "thread.cleared") {
+    const { pendingUsageByRunId: _cleared, ...rest } = prev as LiveThreadSnapshot;
     return {
-      ...prev,
+      ...rest,
       cursor: event.seq,
       messages: [],
       olderCursor: null,
@@ -418,6 +457,7 @@ export function reduceThreadSnapshot(
       blocks,
       botId: event.botId,
       runId: event.runId,
+      usage: usageForLiveMessage(prev, previous, event.runId),
       createdAt: event.createdAt,
     };
     return { ...prev, cursor: event.seq, messages: [...remaining, streaming] };
@@ -437,6 +477,7 @@ export function reduceThreadSnapshot(
       blocks,
       botId: event.botId,
       runId: event.runId,
+      usage: usageForLiveMessage(prev, previous, event.runId),
       createdAt: event.createdAt,
     };
     return { ...prev, cursor: event.seq, messages: [...remaining, next] };
@@ -454,6 +495,7 @@ export function reduceThreadSnapshot(
       blocks: [block],
       botId: event.botId,
       runId: event.runId,
+      usage: pendingUsageForRun(prev, event.runId),
       createdAt: event.createdAt,
     };
     const without: ThreadMessage[] = [];
@@ -480,10 +522,11 @@ export function reduceThreadSnapshot(
     if (!isMessageUsage(event.payload) || !event.runId) {
       return { ...prev, cursor: event.seq };
     }
+    const next = withPendingUsage(prev, event.runId, event.payload);
     return {
-      ...prev,
+      ...next,
       cursor: event.seq,
-      messages: applyMessageUsageByRunId(prev.messages, event.runId, event.payload),
+      messages: applyMessageUsageByRunId(next.messages, event.runId, event.payload),
     };
   }
   if (event.type === "thread.message.created" || event.type === "thread.message.updated") {
@@ -511,6 +554,7 @@ export function reduceThreadSnapshot(
       usage:
         (isMessageUsage(event.payload.usage) ? event.payload.usage : undefined) ??
         previous?.usage ??
+        pendingUsageForRun(prev, event.runId) ??
         existing?.usage,
       createdAt: event.createdAt,
     };

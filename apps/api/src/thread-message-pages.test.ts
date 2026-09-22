@@ -622,8 +622,8 @@ describe("thread message pages", () => {
     const page = await loadMessagePage(prisma, "thread-1", undefined, 2);
 
     expect(page.messages.find((message) => message.id === "message-bot")?.usage).toEqual({
-      provider: "openai",
-      model: "gpt-4.1-mini",
+      provider: "",
+      model: "",
       inputTokens: 12,
       outputTokens: 12,
     });

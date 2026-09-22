@@ -28,9 +28,10 @@ export function addMessageUsage(
     outputTokens: next.outputTokens,
   };
   if (!previous) return usage;
+  const sameModel = previous.provider === usage.provider && previous.model === usage.model;
   return {
-    provider: usage.provider,
-    model: usage.model,
+    provider: sameModel ? usage.provider : "",
+    model: sameModel ? usage.model : "",
     inputTokens: previous.inputTokens + usage.inputTokens,
     outputTokens: previous.outputTokens + usage.outputTokens,
   };
