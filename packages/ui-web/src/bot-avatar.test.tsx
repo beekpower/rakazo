@@ -129,7 +129,11 @@ describe("BotAvatar", () => {
       <BotAvatar color={DEFAULT_GROK_BOT_COLOR} identity="avatar-style-preview" variant="robot" />,
     );
     const organic = renderToString(
-      <BotAvatar color={DEFAULT_GROK_BOT_COLOR} identity="avatar-style-preview" variant="organic" />,
+      <BotAvatar
+        color={DEFAULT_GROK_BOT_COLOR}
+        identity="avatar-style-preview"
+        variant="organic"
+      />,
     );
     expect(robot).not.toEqual(organic);
     expect(robot).toContain("grok-character-eyes");
@@ -165,9 +169,7 @@ describe("BotAvatar", () => {
 
   it("fills the organic body with the resolved palette hex when the custom color is invalid", () => {
     const fallback = resolvePersonaColorDef("maya", "#zzzzzz");
-    const html = renderToString(
-      <BotAvatar color="#zzzzzz" identity="maya" variant="organic" />,
-    );
+    const html = renderToString(<BotAvatar color="#zzzzzz" identity="maya" variant="organic" />);
     expect(html).toContain("rakazo-organic-avatar");
     expect(html).toContain(`fill="${fallback.hex}"`);
     expect(html).not.toContain("#zzzzzz");
