@@ -286,9 +286,12 @@ test("bot message hover reveals model and token usage", async ({ page }, testInf
   await sendComposerMessage(page, composer, `remember hover-usage-${stamp}`);
 
   const transcript = page.getByTestId("transcript");
-  const botText = page.getByText("noted — i will keep that in memory.");
-  await expect(botText).toBeVisible({ timeout: 20_000 });
-  const botRow = transcript.locator("[data-message-id]").filter({ has: botText }).first();
+  const botRow = transcript
+    .locator("[data-message-id]")
+    .filter({ hasText: "noted — i will keep that in memory." })
+    .filter({ has: page.getByTestId("message-hover-usage") })
+    .first();
+  await expect(botRow).toBeVisible({ timeout: 20_000 });
   const usage = botRow.getByTestId("message-hover-usage");
   await expect(usage).toBeAttached({ timeout: 20_000 });
   await expect(usage).toHaveText(/scripted · 12 in · 40 out/);

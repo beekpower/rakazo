@@ -1,2 +1,4 @@
--- usage_records are loaded by runId when attaching per-message token counts.
-CREATE INDEX "usage_records_runId_idx" ON "usage_records"("runId");
+-- Sole statement in this migration so it runs outside an implicit
+-- transaction: CREATE INDEX CONCURRENTLY errors inside one, and only
+-- applies concurrently as a top-level statement.
+CREATE INDEX CONCURRENTLY "usage_records_runId_idx" ON "usage_records"("runId");

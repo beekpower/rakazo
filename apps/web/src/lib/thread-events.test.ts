@@ -482,6 +482,110 @@ describe("thread event reduction", () => {
     );
   });
 
+  it("keeps accumulated usage when a later update would only see the pending stash", () => {
+    const loaded = {
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 12,
+      outputTokens: 40,
+    };
+    const extra = { provider: "scripted", model: "scripted", inputTokens: 3, outputTokens: 1 };
+    const initial = snapshot([
+      {
+        ...message("bot-1", [{ kind: "text", text: "Done." }], 4),
+        runId: "run-1",
+        usage: loaded,
+      },
+    ]);
+
+    const recorded = reduceThreadSnapshot(
+      initial,
+      event({
+        type: "usage.recorded",
+        seq: 5,
+        runId: "run-1",
+        payload: extra,
+      }),
+    );
+    expect(recorded?.messages.find((entry) => entry.id === "bot-1")?.usage).toEqual({
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 15,
+      outputTokens: 41,
+    });
+
+    const updated = reduceThreadSnapshot(
+      recorded,
+      event({
+        type: "thread.message.updated",
+        seq: 6,
+        runId: "run-1",
+        payload: {
+          messageId: "bot-1",
+          role: "bot",
+          blocks: [{ kind: "text", text: "Done now." }],
+        },
+      }),
+    );
+    expect(updated?.messages.find((entry) => entry.id === "bot-1")?.usage).toEqual({
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 15,
+      outputTokens: 41,
+    });
+
+    const withSubagent = snapshot([
+      {
+        ...message("subagent:research", [
+          {
+            kind: "subagent",
+            agentId: "research",
+            name: "Research",
+            task: "Find sources",
+            status: "running",
+          },
+        ]),
+        runId: "run-1",
+        usage: {
+          provider: "scripted",
+          model: "scripted",
+          inputTokens: 15,
+          outputTokens: 41,
+        },
+      },
+    ]);
+    const subagentRecorded = reduceThreadSnapshot(
+      withSubagent,
+      event({
+        type: "usage.recorded",
+        seq: 5,
+        runId: "run-1",
+        payload: extra,
+      }),
+    );
+    const replaced = reduceThreadSnapshot(
+      subagentRecorded,
+      event({
+        type: "thread.subagent",
+        seq: 6,
+        runId: "run-1",
+        payload: {
+          agentId: "research",
+          name: "Research",
+          task: "Find sources",
+          status: "completed",
+          result: "Three sources found",
+        },
+      }),
+    );
+    expect(replaced?.messages.find((entry) => entry.id === "subagent:research")?.usage).toEqual({
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 18,
+      outputTokens: 42,
+    });
+  });
+
   it("event-sources the active run on run.started so Stop does not wait on threads.get", () => {
     const initial = snapshot([]);
     const started = reduceThreadSnapshot(

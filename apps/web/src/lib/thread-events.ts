@@ -487,6 +487,7 @@ export function reduceThreadSnapshot(
   }
   if (event.type === "thread.subagent") {
     const block = subagentBlockFromPayload(event.payload);
+    const existing = prev.messages.find((message) => message.id === `subagent:${block.agentId}`);
     const next: ThreadMessage = {
       id: `subagent:${block.agentId}`,
       threadId: event.threadId,
@@ -495,7 +496,7 @@ export function reduceThreadSnapshot(
       blocks: [block],
       botId: event.botId,
       runId: event.runId,
-      usage: pendingUsageForRun(prev, event.runId),
+      usage: existing?.usage ?? pendingUsageForRun(prev, event.runId),
       createdAt: event.createdAt,
     };
     const without: ThreadMessage[] = [];
@@ -554,8 +555,8 @@ export function reduceThreadSnapshot(
       usage:
         (isMessageUsage(event.payload.usage) ? event.payload.usage : undefined) ??
         previous?.usage ??
-        pendingUsageForRun(prev, event.runId) ??
-        existing?.usage,
+        existing?.usage ??
+        pendingUsageForRun(prev, event.runId),
       createdAt: event.createdAt,
     };
     const replacedSubagentIds = new Set(
