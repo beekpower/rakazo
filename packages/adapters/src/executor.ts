@@ -3632,6 +3632,14 @@ export function createRunExecutor(deps: ExecutorDeps) {
           }
         }
 
+        // Stop during setup must not still open the model. The stream loop only
+        // notices cancellation after the provider request has started.
+        const beforeModel = await deps.prisma.run.findUnique({
+          where: { id: runId },
+          select: { status: true },
+        });
+        if (!beforeModel || isTerminal(beforeModel.status as RunStatus)) return;
+
         try {
           const runtimeEvents = deps.runtime.run(
             {
