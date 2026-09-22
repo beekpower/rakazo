@@ -281,10 +281,10 @@ export function prependThreadMessagePage(
   prev: ThreadSnapshot | null,
   page: ThreadMessagePage,
 ): ThreadSnapshot | null {
-  const next = prependThreadHistoryPage(prev, page);
-  if (!next) return null;
-  const messages = concentrateAllMessageUsage(next.messages);
-  return messages === next.messages ? next : { ...next, messages };
+  const merged = prependThreadHistoryPage(prev, page);
+  if (!merged || merged === prev) return merged;
+  const messages = concentrateAllMessageUsage(merged.messages);
+  return messages === merged.messages ? merged : { ...merged, messages };
 }
 
 export function isThreadSnapshotEvent(event: ProductEvent): boolean {

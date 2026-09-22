@@ -4,6 +4,7 @@ import {
   aggregateUsageRecords,
   applyMessageUsageByRunId,
   attachMessageUsageByRun,
+  concentrateAllMessageUsage,
   concentrateMessageUsageByRunId,
   findMessageUsageTargetIndex,
   isMessageUsage,
@@ -303,6 +304,70 @@ describe("message usage", () => {
     ];
 
     const next = concentrateMessageUsageByRunId(messages, "run-1");
+    expect(next[0]).not.toHaveProperty("usage");
+    expect(next[1]).toMatchObject({ id: "bot-terminal", usage });
+  });
+
+  it("does not attach usage when the terminal seq is not on the page", () => {
+    const usageByRun = new Map([
+      [
+        "run-1",
+        {
+          provider: "scripted",
+          model: "scripted",
+          inputTokens: 12,
+          outputTokens: 40,
+        },
+      ],
+    ]);
+    const messages = [
+      {
+        id: "bot-narration",
+        threadId: "thread-1",
+        seq: 1,
+        role: "bot" as const,
+        blocks: [{ kind: "text" as const, text: "Working." }],
+        runId: "run-1",
+        createdAt: "2026-09-22T00:00:01.000Z",
+      },
+    ];
+
+    expect(
+      attachMessageUsageByRun(messages, usageByRun, new Map([["run-1", "bot-terminal"]])),
+    ).toEqual(messages);
+  });
+
+  it("concentrates usage after older and newer pages are merged", () => {
+    const usage = {
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 12,
+      outputTokens: 40,
+    };
+    const messages = [
+      {
+        id: "bot-narration",
+        threadId: "thread-1",
+        seq: 1,
+        role: "bot" as const,
+        blocks: [{ kind: "text" as const, text: "Working." }],
+        runId: "run-1",
+        usage,
+        createdAt: "2026-09-22T00:00:01.000Z",
+      },
+      {
+        id: "bot-terminal",
+        threadId: "thread-1",
+        seq: 2,
+        role: "bot" as const,
+        blocks: [{ kind: "text" as const, text: "Done." }],
+        runId: "run-1",
+        usage,
+        createdAt: "2026-09-22T00:00:02.000Z",
+      },
+    ];
+
+    const next = concentrateAllMessageUsage(messages);
     expect(next[0]).not.toHaveProperty("usage");
     expect(next[1]).toMatchObject({ id: "bot-terminal", usage });
   });

@@ -1,5 +1,10 @@
 import type { MessageBlock, ThreadMessage, ThreadMessagePage } from "@rakazo/contracts";
-import { aggregateUsageRecords, attachMessageUsageByRun, isPeerReceiptBlocks } from "@rakazo/core";
+import {
+  aggregateUsageRecords,
+  attachMessageUsageByRun,
+  concentrateAllMessageUsage,
+  isPeerReceiptBlocks,
+} from "@rakazo/core";
 import type { Prisma, PrismaClient } from "@rakazo/db";
 
 type MessageDb = PrismaClient | Prisma.TransactionClient;
@@ -90,7 +95,7 @@ export async function loadAllMessages(
     pages.push(page.messages);
     before = page.olderCursor ?? undefined;
   } while (before !== undefined);
-  return pages.reverse().flat();
+  return concentrateAllMessageUsage(pages.reverse().flat());
 }
 
 async function withoutPeerRunMessages<T extends { runId: string | null; blocks: Prisma.JsonValue }>(

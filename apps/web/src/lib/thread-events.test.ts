@@ -123,6 +123,40 @@ describe("thread event reduction", () => {
     expect(next?.olderCursor).toBeNull();
   });
 
+  it("keeps run usage on the terminal reply after prepending an older page", () => {
+    const usage = {
+      provider: "scripted",
+      model: "scripted",
+      inputTokens: 12,
+      outputTokens: 40,
+    };
+    const initial = snapshot(
+      [
+        {
+          ...message("bot-terminal", [{ kind: "text", text: "Done." }], 3),
+          runId: "run-1",
+          usage,
+        },
+      ],
+      3,
+    );
+
+    const next = prependThreadMessagePage(initial, {
+      threadId: "thread-1",
+      messages: [
+        {
+          ...message("bot-narration", [{ kind: "text", text: "Working." }], 2),
+          runId: "run-1",
+          usage,
+        },
+      ],
+      olderCursor: null,
+    });
+
+    expect(next?.messages.find((entry) => entry.id === "bot-narration")?.usage).toBeUndefined();
+    expect(next?.messages.find((entry) => entry.id === "bot-terminal")?.usage).toEqual(usage);
+  });
+
   it("ignores a stale older page after the conversation was cleared", () => {
     const cleared = snapshot([], null);
     const next = prependThreadMessagePage(cleared, {
