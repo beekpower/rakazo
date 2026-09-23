@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   BotSecretDestination,
   botSecretDestinationSchema,
+  decodeLoginSecret,
+  encodeLoginSecret,
   isCloudMetadataHost,
   isPrivateNetworkHost,
   SecretHttpRequest,
@@ -122,5 +124,22 @@ describe("private HTTP credential origins", () => {
     ["example.test", false],
   ])("classifies private host %s", (host, expected) => {
     expect(isPrivateNetworkHost(host)).toBe(expected);
+  });
+});
+
+describe("login credentials", () => {
+  it("accepts a login destination and round-trips its value", () => {
+    expect(
+      BotSecretDestination.safeParse({ ...destination, auth: { type: "login" } }).success,
+    ).toBe(true);
+    const value = { username: "fake-user", password: "fake:password\nwith newline" };
+    expect(decodeLoginSecret(encodeLoginSecret(value))).toEqual(value);
+  });
+
+  it.each([
+    { username: "", password: "fake-password" },
+    { username: "fake-user", password: "" },
+  ])("rejects an incomplete login %j", (value) => {
+    expect(() => encodeLoginSecret(value)).toThrow();
   });
 });

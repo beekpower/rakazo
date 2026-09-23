@@ -83,6 +83,100 @@ describe("browser tools", () => {
     expect(acted).toMatchObject({ ok: true, completed: 1 });
   });
 
+  it("parses fill_secret without a value and rejects unknown fields", () => {
+    expect(
+      parseBrowserActions([
+        { kind: "fill_secret", ref: "e1", secret: "site_login", field: "password" },
+      ]),
+    ).toEqual([{ kind: "fill_secret", ref: "e1", secret: "site_login", field: "password" }]);
+    expect(() =>
+      parseBrowserActions([{ kind: "fill_secret", ref: "e1", secret: "site_login", field: "pin" }]),
+    ).toThrow(/username or password/);
+    expect(() =>
+      parseBrowserActions([{ kind: "fill_secret", ref: "e1", field: "password" }]),
+    ).toThrow(/secret/);
+  });
+
+  describe("saved login fills", () => {
+    const loginPage = (url: string) =>
+      new FakeBrowserProvider({
+        pages: {
+          [url]: {
+            title: "Sign in",
+            html: `<!doctype html><html><head><title>Sign in</title></head><body>
+              <input aria-label="Email" />
+              <input aria-label="Password" type="password" />
+            </body></html>`,
+          },
+        },
+      });
+    async function refs(browser: FakeBrowserProvider, url: string) {
+      await browserNavigateFromTool(browser, computer, context, { url });
+      const snap = (await browserSnapshotFromTool(browser, computer, context, {})) as {
+        elements: Array<{ ref: string; name: string }>;
+      };
+      const ref = (name: string) => snap.elements.find((el) => el.name.includes(name))!.ref;
+      return { email: ref("Email"), password: ref("Password") };
+    }
+    const values = { username: "fake-user@example.test", password: "fake-password-1" };
+    const resolveSecretFill = async (step: { field: "username" | "password" }) => ({
+      text: values[step.field],
+      origin: "https://login.example.test",
+    });
+
+    it("types saved values on the saved origin and redacts them from the result", async () => {
+      const browser = loginPage("https://login.example.test/signin");
+      const { email, password } = await refs(browser, "https://login.example.test/signin");
+      const acted = await browserActFromTool(
+        browser,
+        computer,
+        context,
+        {
+          actions: [
+            { kind: "fill_secret", ref: email, secret: "site_login", field: "username" },
+            { kind: "fill_secret", ref: password, secret: "site_login", field: "password" },
+          ],
+        },
+        { resolveSecretFill, redactions: () => [values.username, values.password] },
+      );
+      expect(acted).toMatchObject({ ok: true, completed: 2 });
+      expect(JSON.stringify(acted)).not.toContain(values.username);
+      expect(JSON.stringify(acted)).not.toContain(values.password);
+    });
+
+    it("refuses to type a saved login on another origin", async () => {
+      const browser = loginPage("https://phish.example.test/signin");
+      const { email } = await refs(browser, "https://phish.example.test/signin");
+      const acted = await browserActFromTool(
+        browser,
+        computer,
+        context,
+        { actions: [{ kind: "fill_secret", ref: email, secret: "site_login", field: "username" }] },
+        { resolveSecretFill },
+      );
+      expect(acted).toMatchObject({ ok: false, completed: 0 });
+      expect(JSON.stringify(acted)).toMatch(/not on the site/);
+    });
+
+    it("acts on nothing when a saved login cannot be resolved", async () => {
+      const browser = loginPage("https://login.example.test/signin");
+      const { email, password } = await refs(browser, "https://login.example.test/signin");
+      const acted = await browserActFromTool(browser, computer, context, {
+        actions: [
+          { kind: "fill", ref: email, text: "typed-before" },
+          { kind: "fill_secret", ref: password, secret: "site_login", field: "password" },
+        ],
+      });
+      expect(acted).toEqual({
+        ok: false,
+        completed: 0,
+        error: "Saved logins are unavailable here.",
+      });
+      const snap = await browserSnapshotFromTool(browser, computer, context, {});
+      expect(JSON.stringify(snap)).not.toContain("typed-before");
+    });
+  });
+
   it("toggles checkboxes via click without undoing activation", async () => {
     const browser = new FakeBrowserProvider({
       pages: {
