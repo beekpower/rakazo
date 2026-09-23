@@ -454,7 +454,11 @@ EVAL_HELPERS = r"""
       el.click();
       return { url: location.href, title: (document.title || "").slice(0, 200) };
     },
-    fill(ref, value) {
+    fill(ref, value, origin) {
+      // Checked in the same evaluation as the fill, so a navigation cannot slip in between.
+      if (origin && location.origin !== origin) {
+        throw new Error("The page is not on the site this login was saved for.");
+      }
       const el = this.resolve(ref);
       if (!el) throw new Error(`Unknown element ref: ${ref}`);
       if (el.readOnly) throw new Error("Element is read-only");
@@ -558,6 +562,10 @@ def act(client: CdpClient, session_id: str, actions: list[dict[str, Any]]) -> di
             raise RuntimeError("Element ref is required")
         if step["kind"] != "click" and not isinstance(step.get("text"), str):
             raise RuntimeError("Text is required")
+        if step.get("origin") is not None and (
+            step["kind"] != "fill" or not isinstance(step["origin"], str)
+        ):
+            raise RuntimeError("An origin applies only to fill")
     ensure_helpers(client, session_id)
     completed = 0
     uncertain = False
@@ -570,6 +578,8 @@ def act(client: CdpClient, session_id: str, actions: list[dict[str, Any]]) -> di
             arguments = json.dumps(ref)
             if kind != "click":
                 arguments += ", " + json.dumps(step["text"])
+            if step.get("origin"):
+                arguments += ", " + json.dumps(step["origin"])
             uncertain = True
             data = eval_json(client, session_id, f"window.__rakazoPageBrowser.{kind}({arguments})")
             if not isinstance(data, dict):
@@ -592,7 +602,21 @@ def exit_when_stdin_closes() -> None:
         os._exit(130)
 
 
+def read_stdin_line() -> str:
+    """Read one line from fd 0 unbuffered, leaving the rest of stdin for the EOF watcher."""
+    data = bytearray()
+    while len(data) < 1_048_576:
+        chunk = os.read(0, 1)
+        if not chunk or chunk == b"\n":
+            break
+        data += chunk
+    return data.decode("utf-8")
+
+
 def run(argv: list[str]) -> int:
+    stdin_args = (
+        read_stdin_line() if os.environ.get("RAKAZO_BROWSER_ARGS_STDIN") == "1" else None
+    )
     if os.environ.get("RAKAZO_BROWSER_WATCH_STDIN") == "1":
         threading.Thread(target=exit_when_stdin_closes, daemon=True).start()
     if len(argv) < 2:
@@ -608,8 +632,9 @@ def run(argv: list[str]) -> int:
         return 2
     command = argv[1]
     args: dict[str, Any] = {}
-    if len(argv) >= 3 and argv[2].strip():
-        args = json.loads(argv[2])
+    raw_args = stdin_args if stdin_args is not None else (argv[2] if len(argv) >= 3 else "")
+    if raw_args.strip():
+        args = json.loads(raw_args)
     port = cdp_port()
     try:
         wait_for_cdp(port)

@@ -137,6 +137,9 @@ export class PageBrowserSession {
       return;
     }
     if (action.kind === "fill" || action.kind === "type") {
+      if (action.origin && new URL(this.url).origin !== action.origin) {
+        throw new Error("The page is not on the site this login was saved for.");
+      }
       const text = action.text;
       if (el instanceof win.HTMLInputElement || el instanceof win.HTMLTextAreaElement) {
         if (action.kind === "fill") el.value = text;

@@ -24,6 +24,9 @@ export const BotSecretAuth = z.discriminatedUnion("type", [
       .max(200)
       .regex(/^[^:\r\n]+$/),
   }),
+  // A website sign-in. The username and password are both protected; the backend only types
+  // them into pages on the saved origin and never sends them as HTTP credentials.
+  z.object({ type: z.literal("login") }),
 ]);
 
 export const BotSecretDestination = z.object({
@@ -49,6 +52,20 @@ export const BotSecretDestination = z.object({
   auth: BotSecretAuth,
 });
 export type BotSecretDestination = z.infer<typeof BotSecretDestination>;
+
+export const LoginSecretValue = z.object({
+  username: z.string().min(1).max(512),
+  password: z.string().min(1).max(4096),
+});
+export type LoginSecretValue = z.infer<typeof LoginSecretValue>;
+
+export function encodeLoginSecret(value: LoginSecretValue): string {
+  return JSON.stringify(LoginSecretValue.parse(value));
+}
+
+export function decodeLoginSecret(plaintext: string): LoginSecretValue {
+  return LoginSecretValue.parse(JSON.parse(plaintext));
+}
 
 /** Written atomically with the protected value, distinct from action approval. */
 export const BotSecretSubmission = z.object({ credentialSaved: BotSecretDestination });

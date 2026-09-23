@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BotSecretDestination, SecretHttpRequest } from "./bot-secrets.js";
+import {
+  BotSecretDestination,
+  decodeLoginSecret,
+  encodeLoginSecret,
+  SecretHttpRequest,
+} from "./bot-secrets.js";
 
 const destination = {
   name: "example_api",
@@ -61,5 +66,22 @@ describe("credential contracts", () => {
         body: "x".repeat(100_001),
       }).success,
     ).toBe(false);
+  });
+});
+
+describe("login credentials", () => {
+  it("accepts a login destination and round-trips its value", () => {
+    expect(
+      BotSecretDestination.safeParse({ ...destination, auth: { type: "login" } }).success,
+    ).toBe(true);
+    const value = { username: "fake-user", password: "fake:password\nwith newline" };
+    expect(decodeLoginSecret(encodeLoginSecret(value))).toEqual(value);
+  });
+
+  it.each([
+    { username: "", password: "fake-password" },
+    { username: "fake-user", password: "" },
+  ])("rejects an incomplete login %j", (value) => {
+    expect(() => encodeLoginSecret(value)).toThrow();
   });
 });
