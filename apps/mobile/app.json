@@ -1,8 +1,7 @@
 {
   "expo": {
-    "name": "Rakazo",
+    "name": "Rakazo (self-hosted)",
     "slug": "rakazo",
-    "owner": "inbox-zero",
     "scheme": "rakazo",
     "version": "1.0.3",
     "orientation": "portrait",
@@ -19,7 +18,12 @@
       ],
       "expo-router",
       "expo-secure-store",
-      ["expo-audio", { "enableBackgroundPlayback": false }],
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": false
+        }
+      ],
       "expo-localization",
       "@react-native-vector-icons/ionicons",
       "@react-native-vector-icons/material-design-icons",
@@ -40,7 +44,8 @@
       ],
       "expo-sharing",
       "./plugins/with-worklets-headers",
-      "./plugins/with-scene-lifecycle"
+      "./plugins/with-scene-lifecycle",
+      "./plugins/with-cleartext-lan"
     ],
     "ios": {
       "bundleIdentifier": "com.rakazo.app",
@@ -60,7 +65,7 @@
       }
     },
     "android": {
-      "package": "com.rakazo.app",
+      "package": "com.rakazo.app.selfhosted",
       "versionCode": 10,
       "softwareKeyboardLayoutMode": "resize",
       "icon": "./assets/icon.png",
@@ -75,16 +80,13 @@
     },
     "extra": {
       "router": {},
-      "supportsRTL": true,
-      "eas": {
-        "projectId": "07f7eb04-45e3-47fe-9374-99a2f991131e"
-      }
+      "supportsRTL": true
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/07f7eb04-45e3-47fe-9374-99a2f991131e"
+      "enabled": false
     }
   }
 }
