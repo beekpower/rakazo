@@ -66,7 +66,7 @@
     },
     "android": {
       "package": "com.rakazo.app.selfhosted",
-      "versionCode": 10,
+      "versionCode": 11,
       "softwareKeyboardLayoutMode": "resize",
       "icon": "./assets/icon.png",
       "adaptiveIcon": {
