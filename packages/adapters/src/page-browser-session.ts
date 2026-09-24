@@ -31,6 +31,8 @@ type DomElement = InstanceType<DomWindow["Element"]>;
 export class PageBrowserSession {
   private dom: JSDOM;
   private refs = new Map<string, DomElement>();
+  /** Fields holding a saved login; snapshots never report their values. */
+  private loginFilled = new WeakSet<DomElement>();
   private nextRef = 1;
 
   constructor(
@@ -141,7 +143,13 @@ export class PageBrowserSession {
         throw new Error("The page is not on the site this login was saved for.");
       }
       const text = action.text;
-      if (el instanceof win.HTMLInputElement || el instanceof win.HTMLTextAreaElement) {
+      const formField = el instanceof win.HTMLInputElement || el instanceof win.HTMLTextAreaElement;
+      if (action.origin && !formField) {
+        throw new Error("A saved login can only be typed into a form field.");
+      }
+      if (formField) {
+        if (action.origin) this.loginFilled.add(el);
+        else this.loginFilled.delete(el);
         if (action.kind === "fill") el.value = text;
         else el.value = `${el.value}${text}`;
         el.dispatchEvent(new win.Event("input", { bubbles: true }));
@@ -178,7 +186,7 @@ export class PageBrowserSession {
       this.refs.set(ref, node);
       const role = roleFor(win, node);
       const name = nameFor(win, node);
-      const value = valueFor(win, node);
+      const value = this.loginFilled.has(node) ? undefined : valueFor(win, node);
       const tag = node.tagName.toLowerCase();
       const entry: BrowserSnapshotNode = { ref, role, name, tag };
       if (value !== undefined) entry.value = value;

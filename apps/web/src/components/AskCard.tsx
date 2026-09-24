@@ -75,10 +75,7 @@ export function AskCard({
     const submitValue = secretInput ? value : value.trim();
     setPendingAction(secretInput ? "submit" : submitValue);
     setError(null);
-    if (secretInput) {
-      setAnswer("");
-      setUsername("");
-    }
+    if (secretInput) setAnswer("");
     try {
       await onAnswer(submitValue, submitUsername);
     } catch (err) {

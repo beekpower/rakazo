@@ -52,6 +52,20 @@ test("saves a website login from a username and password card without echoing ei
   await captureScreenshot(page, testInfo, "login-card-narrow");
   await page.setViewportSize({ width: 1280, height: 720 });
 
+  // A failed save clears the password but keeps the username for the retry.
+  await page.route("**/rpc/threads/answer", (route) =>
+    route.fulfill({
+      status: 400,
+      json: { json: { defined: false, code: "BAD_REQUEST", status: 400, message: "fail" } },
+    }),
+  );
+  await save.click();
+  await expect(card.getByText("Could not submit this answer", { exact: true })).toBeVisible();
+  await expect(passwordField).toHaveValue("");
+  await expect(usernameField).toHaveValue(username);
+  await page.unroute("**/rpc/threads/answer");
+
+  await passwordField.fill(password);
   await save.click();
   await expect(card.getByText("Saved", { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(card.locator("input")).toHaveCount(0);
