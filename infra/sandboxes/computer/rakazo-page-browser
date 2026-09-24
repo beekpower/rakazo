@@ -492,7 +492,11 @@ EVAL_HELPERS = r"""
     type(ref, text) {
       const el = this.resolve(ref);
       if (!el) throw new Error(`Unknown element ref: ${ref}`);
-      return this.fill(ref, `${"value" in el ? el.value : el.textContent || ""}${text}`);
+      // Appending keeps any saved login in the field, so the field stays hidden from snapshots.
+      const holdsLogin = loginFilled.has(el);
+      const result = this.fill(ref, `${"value" in el ? el.value : el.textContent || ""}${text}`);
+      if (holdsLogin) loginFilled.add(el);
+      return result;
     },
   };
   return true;

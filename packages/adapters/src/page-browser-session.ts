@@ -148,8 +148,9 @@ export class PageBrowserSession {
         throw new Error("A saved login can only be typed into a form field.");
       }
       if (formField) {
+        // Only a plain fill replaces a saved login; typing appends to it.
         if (action.origin) this.loginFilled.add(el);
-        else this.loginFilled.delete(el);
+        else if (action.kind === "fill") this.loginFilled.delete(el);
         if (action.kind === "fill") el.value = text;
         else el.value = `${el.value}${text}`;
         el.dispatchEvent(new win.Event("input", { bubbles: true }));

@@ -1694,7 +1694,7 @@ describe("answerRunInput", () => {
       const prisma = {
         $transaction: vi.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
       } as unknown as PrismaClient;
-      const answer = (username?: string) =>
+      const answer = (username?: string, password = "fake-password-1") =>
         answerRunInput(
           prisma,
           {
@@ -1703,7 +1703,7 @@ describe("answerRunInput", () => {
             runId: "run-1",
             messageId: "message-1",
             answeredByUserId: "user-1",
-            answer: "fake-password-1",
+            answer: password,
             ...(username !== undefined ? { username } : {}),
           },
           new TestFanout(),
@@ -1733,6 +1733,13 @@ describe("answerRunInput", () => {
       const { store, tx, answer } = loginFixture();
       await expect(answer(username)).resolves.toBe(false);
       await expect(answer()).resolves.toBe(false);
+      expect(store).not.toHaveBeenCalled();
+      expect(tx.run.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("rejects an oversized password before queueing, not with an internal error", async () => {
+      const { store, tx, answer } = loginFixture();
+      await expect(answer("fake-user", "x".repeat(4097))).resolves.toBe(false);
       expect(store).not.toHaveBeenCalled();
       expect(tx.run.updateMany).not.toHaveBeenCalled();
     });
