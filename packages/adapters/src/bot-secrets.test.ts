@@ -1,4 +1,5 @@
-import { type BotSecretDestination, encodeLoginSecret } from "@rakazo/contracts";
+import type { BotSecretDestination } from "@rakazo/contracts";
+import { encodeLoginSecret } from "@rakazo/contracts";
 import type { PrismaClient } from "@rakazo/db";
 import { describe, expect, it, vi } from "vitest";
 import { requestWithBotSecret, resolveLoginFill } from "./bot-secrets.js";

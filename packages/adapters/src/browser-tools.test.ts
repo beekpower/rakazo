@@ -144,6 +144,52 @@ describe("browser tools", () => {
       expect(JSON.stringify(acted)).not.toContain(values.password);
     });
 
+    it("never reports a login-filled field's value, even when too short to redact", async () => {
+      const browser = loginPage("https://login.example.test/signin");
+      const { email } = await refs(browser, "https://login.example.test/signin");
+      const shortName = async () => ({ text: "ada", origin: "https://login.example.test" });
+      const acted = await browserActFromTool(
+        browser,
+        computer,
+        context,
+        { actions: [{ kind: "fill_secret", ref: email, secret: "site_login", field: "username" }] },
+        { resolveSecretFill: shortName },
+      );
+      expect(acted).toMatchObject({ ok: true });
+      expect(JSON.stringify(acted)).not.toContain("ada");
+      const snap = await browserSnapshotFromTool(browser, computer, context, {});
+      expect(JSON.stringify(snap)).not.toContain("ada");
+    });
+
+    it("refuses to type a saved login into editable page content", async () => {
+      const browser = new FakeBrowserProvider({
+        pages: {
+          "https://login.example.test/notes": {
+            title: "Notes",
+            html: `<!doctype html><html><head><title>Notes</title></head><body>
+              <div contenteditable="true" aria-label="Notes"></div>
+            </body></html>`,
+          },
+        },
+      });
+      await browserNavigateFromTool(browser, computer, context, {
+        url: "https://login.example.test/notes",
+      });
+      const snap = (await browserSnapshotFromTool(browser, computer, context, {})) as {
+        elements: Array<{ ref: string; name: string }>;
+      };
+      const notes = snap.elements.find((el) => el.name.includes("Notes"))!.ref;
+      const acted = await browserActFromTool(
+        browser,
+        computer,
+        context,
+        { actions: [{ kind: "fill_secret", ref: notes, secret: "site_login", field: "username" }] },
+        { resolveSecretFill },
+      );
+      expect(acted).toMatchObject({ ok: false, completed: 0 });
+      expect(JSON.stringify(acted)).toMatch(/form field/);
+    });
+
     it("refuses to type a saved login on another origin", async () => {
       const browser = loginPage("https://phish.example.test/signin");
       const { email } = await refs(browser, "https://phish.example.test/signin");

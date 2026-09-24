@@ -3014,10 +3014,7 @@ function AskBlock({
     const submitUsername = loginInput ? username.trim() : undefined;
     setSubmitting(true);
     setError(null);
-    if (secretInput) {
-      setAnswer("");
-      setUsername("");
-    }
+    if (secretInput) setAnswer("");
     try {
       await onAnswer(submitValue, submitUsername);
     } catch (cause) {

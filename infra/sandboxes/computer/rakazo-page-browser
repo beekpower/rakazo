@@ -344,6 +344,8 @@ EVAL_HELPERS = r"""
 (() => {
   if (window.__rakazoPageBrowser) return true;
   const refMap = new Map();
+  // Fields holding a saved login: snapshots never report their values, whatever their type.
+  const loginFilled = new WeakSet();
   // New snapshots/documents never recycle references. Retain exact nodes, not selectors.
   function newRef() {
     return `e${Array.from(crypto.getRandomValues(new Uint32Array(4)), n => n.toString(16).padStart(8, "0")).join("")}`;
@@ -424,7 +426,7 @@ EVAL_HELPERS = r"""
           ref,
           role: roleOf(el),
           name: String(nameOf(el)).slice(0, 200),
-          value: el.type === "password" ? undefined
+          value: el.type === "password" || loginFilled.has(el) ? undefined
             : ["checkbox", "radio"].includes(el.type) ? (el.checked ? "checked" : "unchecked")
             : "value" in el ? String(el.value ?? "").slice(0, 2000) : undefined,
           tag: el.tagName.toLowerCase(),
@@ -462,6 +464,10 @@ EVAL_HELPERS = r"""
       const el = this.resolve(ref);
       if (!el) throw new Error(`Unknown element ref: ${ref}`);
       if (el.readOnly) throw new Error("Element is read-only");
+      // Editable page content is part of the page text, so a saved login goes only into fields.
+      if (origin && !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+        throw new Error("A saved login can only be typed into a form field.");
+      }
       el.focus();
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
         if (el instanceof HTMLInputElement && !["text", "search", "email", "url", "tel", "password", "number"].includes(el.type)) {
@@ -473,6 +479,8 @@ EVAL_HELPERS = r"""
         if (el.value !== String(value)) throw new Error("Input did not accept the requested value");
         el.dispatchEvent(new Event("input", { bubbles: true }));
         el.dispatchEvent(new Event("change", { bubbles: true }));
+        if (origin) loginFilled.add(el);
+        else loginFilled.delete(el);
       } else if (el.isContentEditable) {
         el.textContent = String(value);
         el.dispatchEvent(new Event("input", { bubbles: true }));

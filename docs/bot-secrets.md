@@ -64,7 +64,7 @@ The card asks for a username and a password. Both are stored encrypted in the sa
 }
 ```
 
-The backend decrypts the value and the page browser types it only if the page is still on the saved origin at that moment, so a login cannot be typed into another site or a page that redirected. Values travel to the computer over stdin, not command-line arguments. Page results are scrubbed of the password, and of the username when it is 6 or more characters (shorter usernames are left alone because redaction replaces every occurrence). A login cannot be used with `secret_request`. Fills need no approval: saving the login is the approval, and it is bound to one site. Use `forget_secret` to remove it.
+The backend decrypts the value and the page browser types it only if the page is still on the saved origin at that moment, so a login cannot be typed into another site or a page that redirected. Values travel to the computer over stdin, not command-line arguments. A saved login can only be typed into a form field, and snapshots never report the value of a field that holds one. Page results are also scrubbed of the password, and of the username when it is 6 or more characters, which covers a site that echoes it in page text; shorter usernames are not scrubbed from page text because redaction replaces every occurrence. A login cannot be used with `secret_request`. Fills need no approval: saving the login is the approval, and it is bound to one site. Use `forget_secret` to remove it.
 
 Two-factor codes, CAPTCHA and passkeys still use `request_takeover`, as does any site where you prefer to sign in yourself.
 
