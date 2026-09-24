@@ -133,12 +133,13 @@ export async function runTrial(
         notifyOnFinish: false,
       });
       botId = bot.id;
-      await discardBotIntroRun(trial, cookie, botId);
       const persistedBot = await prisma.bot.findUniqueOrThrow({
         where: { id: botId },
         select: { userId: true, spaceId: true },
       });
+      // Register before discard so a timeout still reaches cleanupActors.
       actors.push({ botId, cookie, ...persistedBot });
+      await discardBotIntroRun(trial, cookie, botId);
       await rpc(app, cookie, "bots/update", {
         botId,
         modelProvider: options.connection.provider,
