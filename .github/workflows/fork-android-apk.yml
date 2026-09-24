@@ -1,0 +1,69 @@
+name: fork Android APK
+
+# Fork-only: builds the sideloadable self-hosted Android app from a branch that carries the
+# self-hosted build settings (package id, cleartext to a VPN server, no OTA). Started by hand;
+# the APK is a run artifact, not a release. Upstream never runs this.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or commit with the self-hosted Android settings
+        default: selfhost-android
+        required: true
+      server_url:
+        description: Default server baked into the app
+        default: http://10.0.0.2:5173
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-android-apk
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    name: Build APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CI: "1"
+      EXPO_PUBLIC_API_URL: ${{ inputs.server_url }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@48b5f213c81028ace310571dc5ec0fbbca0b2947 # v4.4.3
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter "@rakazo/mobile..."
+      - name: Generate the Android project
+        run: pnpm --filter @rakazo/mobile exec expo prebuild --platform android --clean --no-install
+      - name: Build the release APK
+        working-directory: apps/mobile/android
+        # The Expo template's 2g heap / 512m metaspace runs out in KSP and lint; user-home
+        # gradle.properties overrides the project's.
+        run: |
+          printf 'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g\n' >> "${GRADLE_USER_HOME:-$HOME/.gradle}/gradle.properties"
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+      - name: Record the source commit
+        run: git rev-parse HEAD > apps/mobile/android/app/build/outputs/apk/release/SOURCE_COMMIT
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rakazo-selfhosted-apk
+          path: |
+            apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+            apps/mobile/android/app/build/outputs/apk/release/SOURCE_COMMIT
+          if-no-files-found: error
+          retention-days: 14
