@@ -49,6 +49,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   type TextProps,
@@ -3068,15 +3069,10 @@ function AskBlock({
               autoCorrect={false}
               autoCapitalize="none"
               editable={!submitting}
-              style={{
-                minHeight: 42,
-                borderRadius: 12,
-                borderWidth: 1,
-                borderColor: tokens.border,
-                color: tokens.foreground,
-                paddingHorizontal: 12,
-                paddingVertical: 9,
-              }}
+              style={[
+                askInputStyles.field,
+                { borderColor: tokens.border, color: tokens.foreground },
+              ]}
             />
           ) : null}
           <TextInput
@@ -3091,15 +3087,7 @@ function AskBlock({
             autoCapitalize={secretInput ? "none" : "sentences"}
             editable={!submitting}
             onSubmitEditing={() => void submit()}
-            style={{
-              minHeight: 42,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: tokens.border,
-              color: tokens.foreground,
-              paddingHorizontal: 12,
-              paddingVertical: 9,
-            }}
+            style={[askInputStyles.field, { borderColor: tokens.border, color: tokens.foreground }]}
           />
           <Pressable
             accessibilityRole="button"
@@ -3129,3 +3117,13 @@ function AskBlock({
     </View>
   );
 }
+
+const askInputStyles = StyleSheet.create({
+  field: {
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+});
