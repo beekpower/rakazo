@@ -161,6 +161,32 @@ describe("browser tools", () => {
       expect(JSON.stringify(snap)).not.toContain("ada");
     });
 
+    it("keeps a login-filled field hidden after ordinary typing appends to it", async () => {
+      const browser = loginPage("https://login.example.test/signin");
+      const { email } = await refs(browser, "https://login.example.test/signin");
+      // Each result carries a fresh snapshot, whose refs replace the previous ones.
+      const emailRef = (result: unknown) =>
+        (result as { elements: Array<{ ref: string; name: string }> }).elements.find((el) =>
+          el.name.includes("Email"),
+        )!.ref;
+      const filled = await browserActFromTool(
+        browser,
+        computer,
+        context,
+        { actions: [{ kind: "fill_secret", ref: email, secret: "site_login", field: "username" }] },
+        { resolveSecretFill: async () => ({ text: "ada", origin: "https://login.example.test" }) },
+      );
+      const typed = await browserActFromTool(browser, computer, context, {
+        actions: [{ kind: "type", ref: emailRef(filled), text: "!" }],
+      });
+      expect(typed).toMatchObject({ ok: true });
+      expect(JSON.stringify(typed)).not.toContain("ada");
+      const replaced = await browserActFromTool(browser, computer, context, {
+        actions: [{ kind: "fill", ref: emailRef(typed), text: "visible-now" }],
+      });
+      expect(JSON.stringify(replaced)).toContain("visible-now");
+    });
+
     it("refuses to type a saved login into editable page content", async () => {
       const browser = new FakeBrowserProvider({
         pages: {

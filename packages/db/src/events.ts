@@ -2,6 +2,7 @@ import type { RealtimeFanout } from "@rakazo/adapter-kit";
 import {
   type BotSecretDestination,
   encodeLoginSecret,
+  LoginSecretValue,
   type MessageBlock,
   MessageBlock as MessageBlockSchema,
   type ProductEvent,
@@ -579,6 +580,10 @@ async function commitAnswerRunInput(
   const loginAsk = secretAsk && pendingAsk.credential?.auth.type === "login";
   // A username belongs only to a login card, which cannot be saved without one.
   if (loginAsk !== Boolean(input.username?.trim())) return null;
+  const login = loginAsk
+    ? LoginSecretValue.safeParse({ username: input.username!.trim(), password: input.answer })
+    : undefined;
+  if (login && !login.success) return null;
   let approvalEffect: { id: string; kind: string } | null = null;
   let approvalUserId: string | null = null;
 
@@ -649,9 +654,7 @@ async function commitAnswerRunInput(
       runId: input.runId,
       userId: run.userId,
       spaceId: input.spaceId,
-      plaintext: loginAsk
-        ? encodeLoginSecret({ username: input.username!.trim(), password: input.answer })
-        : input.answer,
+      plaintext: login?.success ? encodeLoginSecret(login.data) : input.answer,
       tx,
     });
     await tx.externalEffect.updateMany({
