@@ -213,7 +213,99 @@ describe("browser tools", () => {
         { resolveSecretFill },
       );
       expect(acted).toMatchObject({ ok: false, completed: 0 });
-      expect(JSON.stringify(acted)).toMatch(/form field/);
+      expect(JSON.stringify(acted)).toMatch(/text, email, password, or telephone/);
+    });
+
+    it("refuses to type a saved login into a textarea or a non-login input type", async () => {
+      const browser = new FakeBrowserProvider({
+        pages: {
+          "https://login.example.test/signin": {
+            title: "Sign in",
+            html: `<!doctype html><html><head><title>Sign in</title></head><body>
+              <textarea aria-label="Username"></textarea>
+              <input aria-label="Query" type="search" />
+              <input aria-label="Website" type="url" />
+              <input aria-label="Pin" type="number" />
+              <input aria-label="Phone" type="tel" />
+            </body></html>`,
+          },
+        },
+      });
+      await browserNavigateFromTool(browser, computer, context, {
+        url: "https://login.example.test/signin",
+      });
+      const ref = async (name: string) => {
+        const snap = (await browserSnapshotFromTool(browser, computer, context, {})) as {
+          elements: Array<{ ref: string; name: string }>;
+        };
+        return snap.elements.find((el) => el.name.includes(name))!.ref;
+      };
+      for (const name of ["Username", "Query", "Website", "Pin"]) {
+        const acted = await browserActFromTool(
+          browser,
+          computer,
+          context,
+          {
+            actions: [
+              {
+                kind: "fill_secret",
+                ref: await ref(name),
+                secret: "site_login",
+                field: "username",
+              },
+            ],
+          },
+          { resolveSecretFill },
+        );
+        expect(acted, name).toMatchObject({ ok: false, completed: 0 });
+        expect(JSON.stringify(acted), name).toMatch(/text, email, password, or telephone/);
+      }
+      const phone = await browserActFromTool(
+        browser,
+        computer,
+        context,
+        {
+          actions: [
+            {
+              kind: "fill_secret",
+              ref: await ref("Phone"),
+              secret: "site_login",
+              field: "username",
+            },
+          ],
+        },
+        { resolveSecretFill },
+      );
+      expect(phone).toMatchObject({ ok: true, completed: 1 });
+    });
+
+    it("refuses to type a saved login on a private-LAN HTTP origin", async () => {
+      const origin = "http://192.168.2.10:8080";
+      const browser = new FakeBrowserProvider({
+        pages: {
+          [`${origin}/signin`]: {
+            title: "Sign in",
+            html: `<!doctype html><html><head><title>Sign in</title></head><body>
+              <input aria-label="Email" />
+            </body></html>`,
+          },
+        },
+      });
+      await browserNavigateFromTool(browser, computer, context, { url: `${origin}/signin` });
+      const snap = (await browserSnapshotFromTool(browser, computer, context, {})) as {
+        elements: Array<{ ref: string; name: string }>;
+      };
+      const email = snap.elements.find((el) => el.name.includes("Email"))!.ref;
+      const acted = await browserActFromTool(
+        browser,
+        computer,
+        context,
+        { actions: [{ kind: "fill_secret", ref: email, secret: "site_login", field: "username" }] },
+        { resolveSecretFill: async () => ({ text: values.username, origin }) },
+      );
+      expect(acted).toMatchObject({ ok: false, completed: 0 });
+      expect(JSON.stringify(acted)).toMatch(/HTTPS/);
+      expect(JSON.stringify(acted)).not.toContain(values.username);
     });
 
     it("refuses to type a saved login on another origin", async () => {

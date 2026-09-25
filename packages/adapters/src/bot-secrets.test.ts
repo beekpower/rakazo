@@ -287,14 +287,14 @@ describe("saved website logins", () => {
     origin: "https://login.example.test",
     auth: { type: "login" },
   };
-  async function loginFixture(username: string, auth: object = login.auth) {
+  async function loginFixture(username: string, auth: object = login.auth, origin = login.origin) {
     const plaintext = encodeLoginSecret({ username, password: "fake-password-1" });
     const encrypted = await secretStore.put(
       plaintext,
       { ...scope, operationId: "test", traceId: "test", signal: new AbortController().signal },
       "login-1",
     );
-    const row = { ...scope, ...login, auth, ...encrypted };
+    const row = { ...scope, ...login, origin, auth, ...encrypted };
     const findFirst = vi.fn(async ({ where }) =>
       Object.entries(where).every(([key, value]) => row[key as keyof typeof row] === value)
         ? row
@@ -343,6 +343,24 @@ describe("saved website logins", () => {
       }),
     ).toEqual({ error: expect.stringContaining("browser_act") });
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("refuses to fill a login saved on plain HTTP, including a private LAN origin", async () => {
+    vi.stubEnv("RAKAZO_SECRETS_ALLOW_PRIVATE_HTTP", "1");
+    const { prisma } = await loginFixture(
+      "fake-user@example.test",
+      login.auth,
+      "http://192.168.2.10:8080",
+    );
+    expect(
+      await resolveLoginFill({
+        prisma,
+        secretStore,
+        scope,
+        name: "site_login",
+        field: "password",
+      }),
+    ).toEqual({ error: "Website logins can only be filled on an HTTPS origin." });
   });
 
   it("refuses to fill a credential that is not a login", async () => {

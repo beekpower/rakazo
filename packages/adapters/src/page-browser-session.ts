@@ -24,6 +24,9 @@ const INTERACTIVE_SELECTOR = [
   "[contenteditable='true']",
 ].join(",");
 
+/** Saved logins are typed only into these input types. Textareas stay out: a username is an input. */
+const LOGIN_FILL_INPUT_TYPES = new Set(["text", "email", "password", "tel"]);
+
 type DomWindow = JSDOM["window"];
 type DomElement = InstanceType<DomWindow["Element"]>;
 
@@ -139,14 +142,30 @@ export class PageBrowserSession {
       return;
     }
     if (action.kind === "fill" || action.kind === "type") {
-      if (action.origin && new URL(this.url).origin !== action.origin) {
-        throw new Error("The page is not on the site this login was saved for.");
+      if (action.origin) {
+        const page = new URL(this.url);
+        let saved: URL;
+        try {
+          saved = new URL(action.origin);
+        } catch {
+          throw new Error("Website logins can only be filled on HTTPS.");
+        }
+        // Private-LAN HTTP never qualifies, even when the page origin matches.
+        if (saved.protocol !== "https:" || page.protocol !== "https:") {
+          throw new Error("Website logins can only be filled on HTTPS.");
+        }
+        if (page.origin !== saved.origin) {
+          throw new Error("The page is not on the site this login was saved for.");
+        }
+        const inputType = el instanceof win.HTMLInputElement ? el.type : "";
+        if (!LOGIN_FILL_INPUT_TYPES.has(inputType)) {
+          throw new Error(
+            "A saved login can only be typed into a text, email, password, or telephone field.",
+          );
+        }
       }
       const text = action.text;
       const formField = el instanceof win.HTMLInputElement || el instanceof win.HTMLTextAreaElement;
-      if (action.origin && !formField) {
-        throw new Error("A saved login can only be typed into a form field.");
-      }
       if (formField) {
         // Only a plain fill replaces a saved login; typing appends to it.
         if (action.origin) this.loginFilled.add(el);

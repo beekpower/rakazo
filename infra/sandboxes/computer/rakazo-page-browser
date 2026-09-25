@@ -458,15 +458,23 @@ EVAL_HELPERS = r"""
     },
     fill(ref, value, origin) {
       // Checked in the same evaluation as the fill, so a navigation cannot slip in between.
-      if (origin && location.origin !== origin) {
-        throw new Error("The page is not on the site this login was saved for.");
+      // Private-LAN plain HTTP is not a login target, even when the page origin matches.
+      if (origin) {
+        let saved = null;
+        try { saved = new URL(origin); } catch { /* rejected below */ }
+        if (!saved || saved.protocol !== "https:" || location.protocol !== "https:") {
+          throw new Error("Website logins can only be filled on HTTPS.");
+        }
+        if (location.origin !== saved.origin) {
+          throw new Error("The page is not on the site this login was saved for.");
+        }
       }
       const el = this.resolve(ref);
       if (!el) throw new Error(`Unknown element ref: ${ref}`);
       if (el.readOnly) throw new Error("Element is read-only");
-      // Editable page content is part of the page text, so a saved login goes only into fields.
-      if (origin && !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
-        throw new Error("A saved login can only be typed into a form field.");
+      // A username is an input. Textareas, search boxes, and editable page content stay out.
+      if (origin && !(el instanceof HTMLInputElement && ["text", "email", "password", "tel"].includes(el.type))) {
+        throw new Error("A saved login can only be typed into a text, email, password, or telephone field.");
       }
       el.focus();
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {

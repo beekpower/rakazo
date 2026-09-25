@@ -236,9 +236,22 @@ export async function resolveLoginFill(input: {
     where: { ...scopeFields(input.scope), name: input.name },
   });
   if (!row) return { error: "Login is unavailable. Use request_secret to save it first." };
+  // Checked on the stored origin itself, so the private-LAN HTTP allowance cannot widen a login.
+  let storedOrigin: URL;
+  try {
+    storedOrigin = new URL(row.origin);
+  } catch {
+    return { error: "Website logins can only be filled on an HTTPS origin." };
+  }
+  if (storedOrigin.protocol !== "https:") {
+    return { error: "Website logins can only be filled on an HTTPS origin." };
+  }
   const destination = normalizeSecretDestination(row);
   if (destination.auth.type !== "login") {
     return { error: "This credential is not a website login." };
+  }
+  if (destination.origin !== storedOrigin.origin) {
+    return { error: "Website logins can only be filled on an HTTPS origin." };
   }
   const login = decodeLoginSecret(input.secretStore.load(row.ciphertext, row.id));
   return {

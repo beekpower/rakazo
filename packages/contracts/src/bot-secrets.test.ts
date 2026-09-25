@@ -97,6 +97,16 @@ describe("private HTTP credential origins", () => {
       false,
     );
   });
+  it("rejects a private HTTP origin for a website login even when the owner opts in", () => {
+    expect(
+      relaxed.safeParse({
+        ...destination,
+        origin: "http://192.168.2.10:8080",
+        auth: { type: "login" },
+      }).success,
+    ).toBe(false);
+    expect(relaxed.safeParse({ ...destination, auth: { type: "login" } }).success).toBe(true);
+  });
   it.each([
     "http://192.168.2.10:8080/upload",
     "http://192.168.2.10:8080?key=1",

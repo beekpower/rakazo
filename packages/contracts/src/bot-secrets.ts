@@ -82,11 +82,26 @@ function botSecretOriginSchema(allowPrivateHttpOrigin: boolean) {
 }
 
 export function botSecretDestinationSchema(options?: { allowPrivateHttpOrigin?: boolean }) {
-  return z.object({
-    name: BotSecretName,
-    origin: botSecretOriginSchema(options?.allowPrivateHttpOrigin === true),
-    auth: BotSecretAuth,
-  });
+  return z
+    .object({
+      name: BotSecretName,
+      origin: botSecretOriginSchema(options?.allowPrivateHttpOrigin === true),
+      auth: BotSecretAuth,
+    })
+    .superRefine((destination, ctx) => {
+      // Private-LAN plain HTTP is for API credentials only. A website login is typed into a page.
+      if (destination.auth.type !== "login") return;
+      try {
+        if (new URL(destination.origin).protocol === "https:") return;
+      } catch {
+        /* The origin schema already rejects unparseable values. */
+      }
+      ctx.addIssue({
+        code: "custom",
+        path: ["origin"],
+        message: "Website logins require an HTTPS origin",
+      });
+    });
 }
 export const BotSecretDestination = botSecretDestinationSchema();
 export type BotSecretDestination = z.infer<typeof BotSecretDestination>;
